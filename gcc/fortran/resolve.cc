@@ -1585,7 +1585,7 @@ resolve_structure_cons (gfc_expr *expr, int init)
 /* Returns 0 if a symbol was not declared with a type or
    attribute declaration statement, nonzero otherwise.  */
 
-static int
+static bool
 was_declared (gfc_symbol *sym)
 {
   symbol_attribute a;
@@ -3091,13 +3091,13 @@ is_external_proc (gfc_symbol *sym)
 /* Figure out if a function reference is pure or not.  Also set the name
    of the function for a potential error message.  Return nonzero if the
    function is PURE, zero if not.  */
-static int
+static bool
 pure_stmt_function (gfc_expr *, gfc_symbol *);
 
-int
+bool
 gfc_pure_function (gfc_expr *e, const char **name)
 {
-  int pure;
+  bool pure;
   gfc_component *comp;
 
   *name = NULL;
@@ -3137,7 +3137,7 @@ gfc_pure_function (gfc_expr *e, const char **name)
 
 /* Check if the expression is a reference to an implicitly pure function.  */
 
-int
+bool
 gfc_implicit_pure_function (gfc_expr *e)
 {
   gfc_component *comp = gfc_get_proc_ptr_comp (e);
@@ -3168,7 +3168,7 @@ impure_stmt_fcn (gfc_expr *e, gfc_symbol *sym,
 }
 
 
-static int
+static bool
 pure_stmt_function (gfc_expr *e, gfc_symbol *sym)
 {
   return gfc_traverse_expr (e, sym, impure_stmt_fcn, 0) ? 0 : 1;
@@ -4200,6 +4200,17 @@ resolve_operator (gfc_expr *e)
     case INTRINSIC_POWER:
       if (gfc_numeric_ts (&op1->ts) && gfc_numeric_ts (&op2->ts))
 	{
+	  /* Do not perform conversions if operands are not conformable as
+	     required for the binary intrinsic operators (F2018:10.1.5).
+	     Defer to a possibly overloading user-defined operator.  */
+	  if (!gfc_op_rank_conformable (op1, op2))
+	    {
+	      dual_locus_error = true;
+	      snprintf (msg, sizeof (msg),
+			_("Inconsistent ranks for operator at %%L and %%L"));
+	      goto bad_op;
+	    }
+
 	  gfc_type_convert_binary (e, 1);
 	  break;
 	}
@@ -4372,6 +4383,17 @@ resolve_operator (gfc_expr *e)
 
       if (gfc_numeric_ts (&op1->ts) && gfc_numeric_ts (&op2->ts))
 	{
+	  /* Do not perform conversions if operands are not conformable as
+	     required for the binary intrinsic operators (F2018:10.1.5).
+	     Defer to a possibly overloading user-defined operator.  */
+	  if (!gfc_op_rank_conformable (op1, op2))
+	    {
+	      dual_locus_error = true;
+	      snprintf (msg, sizeof (msg),
+			_("Inconsistent ranks for operator at %%L and %%L"));
+	      goto bad_op;
+	    }
+
 	  gfc_type_convert_binary (e, 1);
 
 	  e->ts.type = BT_LOGICAL;
@@ -5504,7 +5526,9 @@ gfc_resolve_ref (gfc_expr *expr)
 	case REF_INQUIRY:
 	  /* Implement requirement in note 9.7 of F2018 that the result of the
 	     LEN inquiry be a scalar.  */
-	  if (ref->u.i == INQUIRY_LEN && array_ref && expr->ts.deferred)
+	  if (ref->u.i == INQUIRY_LEN && array_ref
+	      && ((expr->ts.type == BT_CHARACTER && !expr->ts.u.cl->length)
+		  || expr->ts.type == BT_INTEGER))
 	    {
 	      array_ref->u.ar.type = AR_ELEMENT;
 	      expr->rank = 0;
@@ -5641,6 +5665,21 @@ gfc_expression_rank (gfc_expr *e)
 
 done:
   expression_shape (e);
+}
+
+
+/* Given two expressions, check that their rank is conformable, i.e. either
+   both have the same rank or at least one is a scalar.  */
+
+bool
+gfc_op_rank_conformable (gfc_expr *op1, gfc_expr *op2)
+{
+  if (op1->expr_type == EXPR_VARIABLE)
+    gfc_expression_rank (op1);
+  if (op2->expr_type == EXPR_VARIABLE)
+    gfc_expression_rank (op2);
+
+  return (op1->rank == 0 || op2->rank == 0 || op1->rank == op2->rank);
 }
 
 
@@ -5883,7 +5922,7 @@ resolve_variable (gfc_expr *e)
       /* Because this is an associate var and the first ref either is a ref to
 	 the _data component or not, no traversal of the ref chain is
 	 needed.  The array ref needs to be inserted after the _data ref,
-	 or when that is not present, which may happend for polymorphic
+	 or when that is not present, which may happened for polymorphic
 	 types, then at the first position.  */
       ref = e->ref;
       if (!ref)
@@ -6102,7 +6141,7 @@ resolve_procedure:
 	     the symbol in the expression and convert the array reference
 	     into an actual arglist if the old symbol is a variable; or
 	(ii) That in which an external function is typed but not declared
-	     explcitly to be external. Here, the old symbol is changed
+	     explicitly to be external. Here, the old symbol is changed
 	     from a variable to an external function.  */
 static bool
 check_host_association (gfc_expr *e)
@@ -7593,7 +7632,7 @@ resolve_forall_iterators (gfc_forall_iterator *it)
    PRIVATE.  The search is recursive if necessary.  Returns zero if no
    inaccessible components are found, nonzero otherwise.  */
 
-static int
+static bool
 derived_inaccessible (gfc_symbol *sym)
 {
   gfc_component *c;
@@ -9894,8 +9933,7 @@ resolve_select_type (gfc_code *code, gfc_namespace *old_ns)
   gfc_resolve_blocks (code->block, gfc_current_ns);
   gfc_current_ns = old_ns;
 
-  if (ref)
-    free (ref);
+  free (ref);
 }
 
 
@@ -11006,6 +11044,8 @@ gfc_resolve_blocks (gfc_code *b, gfc_namespace *ns)
 	case EXEC_OACC_ENTER_DATA:
 	case EXEC_OACC_EXIT_DATA:
 	case EXEC_OACC_ROUTINE:
+	case EXEC_OMP_ALLOCATE:
+	case EXEC_OMP_ALLOCATORS:
 	case EXEC_OMP_ASSUME:
 	case EXEC_OMP_CRITICAL:
 	case EXEC_OMP_DISTRIBUTE:
@@ -11129,12 +11169,23 @@ resolve_ordinary_assign (gfc_code *code, gfc_namespace *ns)
   lhs = code->expr1;
   rhs = code->expr2;
 
+  if ((lhs->symtree->n.sym->ts.type == BT_DERIVED
+       || lhs->symtree->n.sym->ts.type == BT_CLASS)
+      && !lhs->symtree->n.sym->attr.proc_pointer
+      && gfc_expr_attr (lhs).proc_pointer)
+    {
+      gfc_error ("Variable in the ordinary assignment at %L is a procedure "
+		 "pointer component",
+		 &lhs->where);
+      return false;
+    }
+
   if ((gfc_numeric_ts (&lhs->ts) || lhs->ts.type == BT_LOGICAL)
       && rhs->ts.type == BT_CHARACTER
       && (rhs->expr_type != EXPR_CONSTANT || !flag_dec_char_conversions))
     {
       /* Use of -fdec-char-conversions allows assignment of character data
-	 to non-character variables.  This not permited for nonconstant
+	 to non-character variables.  This not permitted for nonconstant
 	 strings.  */
       gfc_error ("Cannot convert %s to %s at %L", gfc_typename (rhs),
 		 gfc_typename (lhs), &rhs->where);
@@ -12663,6 +12714,8 @@ start:
 	  gfc_resolve_oacc_directive (code, ns);
 	  break;
 
+	case EXEC_OMP_ALLOCATE:
+	case EXEC_OMP_ALLOCATORS:
 	case EXEC_OMP_ASSUME:
 	case EXEC_OMP_ATOMIC:
 	case EXEC_OMP_BARRIER:
@@ -15140,7 +15193,7 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
   /* Check type-spec if this is not the parent-type component.  */
   if (((sym->attr.is_class
         && (!sym->components->ts.u.derived->attr.extension
-            || c != sym->components->ts.u.derived->components))
+	    || c != CLASS_DATA (sym->components)))
        || (!sym->attr.is_class
            && (!sym->attr.extension || c != sym->components)))
       && !sym->attr.vtype
@@ -15153,7 +15206,7 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
      component.  */
   if (super_type
       && ((sym->attr.is_class
-           && c == sym->components->ts.u.derived->components)
+	   && c == CLASS_DATA (sym->components))
           || (!sym->attr.is_class && c == sym->components))
       && strcmp (super_type->name, c->name) == 0)
     c->attr.access = super_type->attr.access;
@@ -15399,7 +15452,7 @@ resolve_fl_derived0 (gfc_symbol *sym)
       return false;
     }
 
-  c = (sym->attr.is_class) ? sym->components->ts.u.derived->components
+  c = (sym->attr.is_class) ? CLASS_DATA (sym->components)
 			   : sym->components;
 
   success = true;
@@ -17090,7 +17143,7 @@ resolve_data (gfc_data *d)
 /* Determines if a variable is not 'pure', i.e., not assignable within a pure
    procedure.  Returns zero if assignment is OK, nonzero if there is a
    problem.  */
-int
+bool
 gfc_impure_variable (gfc_symbol *sym)
 {
   gfc_symbol *proc;
@@ -17125,7 +17178,7 @@ gfc_impure_variable (gfc_symbol *sym)
 /* Test whether a symbol is pure or not.  For a NULL pointer, checks if the
    current namespace is inside a pure procedure.  */
 
-int
+bool
 gfc_pure (gfc_symbol *sym)
 {
   symbol_attribute attr;
@@ -17157,7 +17210,7 @@ gfc_pure (gfc_symbol *sym)
    checks if the current namespace is implicitly pure.  Note that this
    function returns false for a PURE procedure.  */
 
-int
+bool
 gfc_implicit_pure (gfc_symbol *sym)
 {
   gfc_namespace *ns;
@@ -17211,7 +17264,7 @@ gfc_unset_implicit_pure (gfc_symbol *sym)
 
 /* Test whether the current procedure is elemental or not.  */
 
-int
+bool
 gfc_elemental (gfc_symbol *sym)
 {
   symbol_attribute attr;
@@ -17958,6 +18011,8 @@ resolve_codes (gfc_namespace *ns)
   gfc_resolve_oacc_declare (ns);
   gfc_resolve_oacc_routines (ns);
   gfc_resolve_omp_local_vars (ns);
+  if (ns->omp_allocate)
+    gfc_resolve_omp_allocate (ns, ns->omp_allocate);
   gfc_resolve_code (ns->code, ns);
 
   bitmap_obstack_release (&labels_obstack);

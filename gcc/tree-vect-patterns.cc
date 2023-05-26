@@ -65,12 +65,13 @@ static bool
 vect_get_range_info (tree var, wide_int *min_value, wide_int *max_value)
 {
   value_range vr;
+  tree vr_min, vr_max;
   get_range_query (cfun)->range_of_expr (vr, var);
   if (vr.undefined_p ())
     vr.set_varying (TREE_TYPE (var));
-  *min_value = wi::to_wide (vr.min ());
-  *max_value = wi::to_wide (vr.max ());
-  value_range_kind vr_type = vr.kind ();
+  value_range_kind vr_type = get_legacy_range (vr, vr_min, vr_max);
+  *min_value = wi::to_wide (vr_min);
+  *max_value = wi::to_wide (vr_max);
   wide_int nonzero = get_nonzero_bits (var);
   signop sgn = TYPE_SIGN (TREE_TYPE (var));
   if (intersect_range_with_nonzero_bits (vr_type, min_value, max_value,
@@ -4597,7 +4598,7 @@ vect_recog_divmod_pattern (vec_info *vinfo,
       int msb = 1;
       value_range r;
       get_range_query (cfun)->range_of_expr (r, oprnd0);
-      if (r.kind () == VR_RANGE)
+      if (!r.varying_p () && !r.undefined_p ())
 	{
 	  if (!wi::neg_p (r.lower_bound (), TYPE_SIGN (itype)))
 	    msb = 0;

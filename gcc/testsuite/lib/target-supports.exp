@@ -1146,6 +1146,17 @@ proc check_effective_target_mmap {} {
 # Return 1 if the target supports sysconf, 0 otherwise.
 
 proc check_effective_target_sysconf {} {
+    # VxWorks has sysconf in rtp mode only, but our way to test can't
+    # tell kernel mode doesn't, as we're doing partial links for
+    # kernel modules.  We can tell by checking for a declaration, or
+    # for some sysconf parm, because configurations that don't offer
+    # sysconf don't have either.
+    if { [istarget *-*-vxworks*] } {
+	return [check_no_compiler_messages sysconfdecl assembly {
+	    #include <unistd.h>
+	    int f() { return sysconf(_SC_PAGESIZE); }
+	}];
+    }
     return [check_function_available "sysconf"]
 }
 
@@ -12267,7 +12278,7 @@ proc check_effective_target_o_flag_in_section { } {
 # return 1 if LRA is supported.
 
 proc check_effective_target_lra { } {
-    if { [istarget hppa*-*-*] || [istarget cris-*-*] } {
+    if { [istarget hppa*-*-*] || [istarget cris-*-*] || [istarget avr-*-*] } {
 	return 0
     }
     return 1

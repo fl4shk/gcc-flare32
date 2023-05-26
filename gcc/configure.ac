@@ -473,7 +473,7 @@ AC_CHECK_SIZEOF(dev_t)
 if test "$enable_largefile" != no; then
   case "$host, $build" in
     *-*-aix*,*|*,*-*-aix*)
-      if test "$ac_cv_sizeof_ino_t" == "4" -a "$ac_cv_sizeof_dev_t" == 4; then
+      if test "$ac_cv_sizeof_ino_t" = "4" -a "$ac_cv_sizeof_dev_t" = 4; then
 	AC_DEFINE(HOST_STAT_FOR_64BIT_INODES, stat64x,
 	  [Define which stat syscall is able to handle 64bit indodes.])
       fi;;
@@ -920,6 +920,21 @@ fi
 
 AC_DEFINE_UNQUOTED(DEFAULT_STK_CLASH_GUARD_SIZE, $DEFAULT_STK_CLASH_GUARD_SIZE,
 	[Define to larger than zero set the default stack clash protector size.])
+
+# Specify the number of splits of match.pd to generate.
+AC_ARG_WITH(matchpd-partitions,
+[AS_HELP_STRING([--with-matchpd-partitions=num],
+[Set the number of partitions to make for gimple and generic when splitting match.pd. [default=10]])],
+[DEFAULT_MATCHPD_PARTITIONS="$with_matchpd_partitions"], [DEFAULT_MATCHPD_PARTITIONS=10])
+if (test $DEFAULT_MATCHPD_PARTITIONS -lt 1); then
+  AC_MSG_ERROR(m4_normalize([
+		Invalid value $DEFAULT_MATCHPD_PARTITIONS for --with-matchpd-partitions. \
+		Cannot be negative.]))
+fi
+
+AC_DEFINE_UNQUOTED(DEFAULT_MATCHPD_PARTITIONS, $DEFAULT_MATCHPD_PARTITIONS,
+	[Define to larger than one set the number of match.pd partitions to make.])
+AC_SUBST(DEFAULT_MATCHPD_PARTITIONS)
 
 # Enable __cxa_atexit for C++.
 AC_ARG_ENABLE(__cxa_atexit,
@@ -3187,16 +3202,19 @@ elif test x$gcc_cv_as != x -a x$gcc_cv_ld != x -a x$gcc_cv_objdump != x ; then
   echo '.byte 0' >> conftest3.s
   if $gcc_cv_as -o conftest1.o conftest1.s > /dev/null 2>&1 \
      && $gcc_cv_as -o conftest2.o conftest2.s > /dev/null 2>&1 \
-     && $gcc_cv_as -o conftest3.o conftest3.s > /dev/null 2>&1 \
-     && $gcc_cv_ld -shared -o conftest1.so conftest1.o \
-	conftest2.o conftest3.o > /dev/null 2>&1; then
-    gcc_cv_ld_ro_rw_mix=`$gcc_cv_objdump -h conftest1.so \
-			 | sed -e '/myfoosect/!d' -e N`
-    if echo "$gcc_cv_ld_ro_rw_mix" | grep CONTENTS > /dev/null; then
-      if echo "$gcc_cv_ld_ro_rw_mix" | grep READONLY > /dev/null; then
-	gcc_cv_ld_ro_rw_mix=read-only
-      else
-	gcc_cv_ld_ro_rw_mix=read-write
+     && $gcc_cv_as -o conftest3.o conftest3.s > /dev/null 2>&1; then
+    if $gcc_cv_ld -shared -o conftest1.so conftest1.o \
+       conftest2.o conftest3.o > /dev/null 2>&1 \
+       || $gcc_cv_ld -r -o conftest1.so conftest1.o \
+	  conftest2.o conftest3.o > /dev/null 2>&1; then
+      gcc_cv_ld_ro_rw_mix=`$gcc_cv_objdump -h conftest1.so \
+			   | sed -e '/myfoosect/!d' -e N`
+      if echo "$gcc_cv_ld_ro_rw_mix" | grep CONTENTS > /dev/null; then
+	if echo "$gcc_cv_ld_ro_rw_mix" | grep READONLY > /dev/null; then
+	  gcc_cv_ld_ro_rw_mix=read-only
+	else
+	  gcc_cv_ld_ro_rw_mix=read-write
+	fi
       fi
     fi
   fi

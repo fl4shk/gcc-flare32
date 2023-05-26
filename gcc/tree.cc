@@ -2667,6 +2667,36 @@ build_zero_cst (tree type)
     }
 }
 
+/* Build a constant of integer type TYPE, made of VALUE's bits replicated
+   every WIDTH bits to fit TYPE's precision.  */
+
+tree
+build_replicated_int_cst (tree type, unsigned int width, HOST_WIDE_INT value)
+{
+  int n = (TYPE_PRECISION (type) + HOST_BITS_PER_WIDE_INT - 1)
+    / HOST_BITS_PER_WIDE_INT;
+  unsigned HOST_WIDE_INT low, mask;
+  HOST_WIDE_INT a[WIDE_INT_MAX_ELTS];
+  int i;
+
+  gcc_assert (n && n <= WIDE_INT_MAX_ELTS);
+
+  if (width == HOST_BITS_PER_WIDE_INT)
+    low = value;
+  else
+    {
+      mask = ((HOST_WIDE_INT)1 << width) - 1;
+      low = (unsigned HOST_WIDE_INT) ~0 / mask * (value & mask);
+    }
+
+  for (i = 0; i < n; i++)
+    a[i] = low;
+
+  gcc_assert (TYPE_PRECISION (type) <= MAX_BITSIZE_MODE_ANY_INT);
+  return wide_int_to_tree
+    (type, wide_int::from_array (a, n, TYPE_PRECISION (type)));
+}
+
 /* If floating-point type TYPE has an IEEE-style sign bit, return an
    unsigned constant in which only the sign bit is set.  Return null
    otherwise.  */
@@ -2689,7 +2719,7 @@ sign_mask_for (tree type)
     return NULL_TREE;
 
   auto mask = wi::set_bit_in_zero (bits - 1, bits);
-  if (TREE_CODE (inttype) == VECTOR_TYPE)
+  if (VECTOR_TYPE_P (inttype))
     {
       tree elt = wide_int_to_tree (TREE_TYPE (inttype), mask);
       return build_vector_from_val (inttype, elt);
@@ -4929,7 +4959,7 @@ do { tree _node = (NODE); \
      address is constant too.  If it's a decl, its address is constant if the
      decl is static.  Everything else is not constant and, furthermore,
      taking the address of a volatile variable is not volatile.  */
-  if (TREE_CODE (node) == INDIRECT_REF
+  if (INDIRECT_REF_P (node)
       || TREE_CODE (node) == MEM_REF)
     UPDATE_FLAGS (TREE_OPERAND (node, 0));
   else if (CONSTANT_CLASS_P (node))
@@ -7310,18 +7340,6 @@ tree
 build_array_type_nelts (tree elt_type, poly_uint64 nelts)
 {
   return build_array_type (elt_type, build_index_type (size_int (nelts - 1)));
-}
-
-/* Recursively examines the array elements of TYPE, until a non-array
-   element type is found.  */
-
-tree
-strip_array_types (tree type)
-{
-  while (TREE_CODE (type) == ARRAY_TYPE)
-    type = TREE_TYPE (type);
-
-  return type;
 }
 
 /* Computes the canonical argument types from the argument type list
@@ -12213,23 +12231,6 @@ get_binfo_at_offset (tree binfo, poly_int64 offset, tree expected_type)
     }
 }
 
-/* Returns true if X is a typedef decl.  */
-
-bool
-is_typedef_decl (const_tree x)
-{
-  return (x && TREE_CODE (x) == TYPE_DECL
-          && DECL_ORIGINAL_TYPE (x) != NULL_TREE);
-}
-
-/* Returns true iff TYPE is a type variant created for a typedef. */
-
-bool
-typedef_variant_p (const_tree type)
-{
-  return is_typedef_decl (TYPE_NAME (type));
-}
-
 /* PR 84195: Replace control characters in "unescaped" with their
    escaped equivalents.  Allow newlines if -fmessage-length has
    been set to a non-zero value.  This is done here, rather than
@@ -13461,8 +13462,8 @@ verify_type_variant (const_tree t, tree tv)
   if ((TREE_CODE (t) == ENUMERAL_TYPE && COMPLETE_TYPE_P (t))
        || TREE_CODE (t) == INTEGER_TYPE
        || TREE_CODE (t) == BOOLEAN_TYPE
-       || TREE_CODE (t) == REAL_TYPE
-       || TREE_CODE (t) == FIXED_POINT_TYPE)
+       || SCALAR_FLOAT_TYPE_P (t)
+       || FIXED_POINT_TYPE_P (t))
     {
       verify_variant_match (TYPE_MAX_VALUE);
       verify_variant_match (TYPE_MIN_VALUE);
@@ -13542,7 +13543,7 @@ verify_type_variant (const_tree t, tree tv)
           return false;
 	}
     }
-  else if ((TREE_CODE (t) == FUNCTION_TYPE || TREE_CODE (t) == METHOD_TYPE))
+  else if (FUNC_OR_METHOD_TYPE_P (t))
     verify_variant_match (TYPE_ARG_TYPES);
   /* For C++ the qualified variant of array type is really an array type
      of qualified TREE_TYPE.
@@ -13683,7 +13684,7 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
   /* Qualifiers do not matter for canonical type comparison purposes.  */
 
   /* Void types and nullptr types are always the same.  */
-  if (TREE_CODE (t1) == VOID_TYPE
+  if (VOID_TYPE_P (t1)
       || TREE_CODE (t1) == NULLPTR_TYPE)
     return true;
 
@@ -13695,7 +13696,7 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
   if (INTEGRAL_TYPE_P (t1)
       || SCALAR_FLOAT_TYPE_P (t1)
       || FIXED_POINT_TYPE_P (t1)
-      || TREE_CODE (t1) == VECTOR_TYPE
+      || VECTOR_TYPE_P (t1)
       || TREE_CODE (t1) == COMPLEX_TYPE
       || TREE_CODE (t1) == OFFSET_TYPE
       || POINTER_TYPE_P (t1))
@@ -13725,7 +13726,7 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
 	}
 
       /* Tail-recurse to components.  */
-      if (TREE_CODE (t1) == VECTOR_TYPE
+      if (VECTOR_TYPE_P (t1)
 	  || TREE_CODE (t1) == COMPLEX_TYPE)
 	return gimple_canonical_types_compatible_p (TREE_TYPE (t1),
 						    TREE_TYPE (t2),
@@ -14042,8 +14043,8 @@ verify_type (const_tree t)
 	  error_found = true;
 	}
     }
-  else if (INTEGRAL_TYPE_P (t) || TREE_CODE (t) == REAL_TYPE
-	   || TREE_CODE (t) == FIXED_POINT_TYPE)
+  else if (INTEGRAL_TYPE_P (t) || SCALAR_FLOAT_TYPE_P (t)
+	   || FIXED_POINT_TYPE_P (t))
     {
       /* FIXME: The following check should pass:
 	  useless_type_conversion_p (const_cast <tree> (t),
@@ -14069,7 +14070,7 @@ verify_type (const_tree t)
 	  error_found = true;
 	}
     }
-  else if (TREE_CODE (t) == FUNCTION_TYPE || TREE_CODE (t) == METHOD_TYPE)
+  else if (FUNC_OR_METHOD_TYPE_P (t))
     {
       if (TYPE_METHOD_BASETYPE (t)
 	  && TREE_CODE (TYPE_METHOD_BASETYPE (t)) != RECORD_TYPE
@@ -14091,8 +14092,8 @@ verify_type (const_tree t)
 	  error_found = true;
 	}
     }
-  else if (INTEGRAL_TYPE_P (t) || TREE_CODE (t) == REAL_TYPE
-	   || TREE_CODE (t) == FIXED_POINT_TYPE)
+  else if (INTEGRAL_TYPE_P (t) || SCALAR_FLOAT_TYPE_P (t)
+	   || FIXED_POINT_TYPE_P (t))
     {
       /* FIXME: The following check should pass:
 	  useless_type_conversion_p (const_cast <tree> (t),
@@ -14234,7 +14235,7 @@ verify_type (const_tree t)
 	      }
 	}
     }
-  else if (TREE_CODE (t) == FUNCTION_TYPE || TREE_CODE (t) == METHOD_TYPE)
+  else if (FUNC_OR_METHOD_TYPE_P (t))
     for (tree l = TYPE_ARG_TYPES (t); l; l = TREE_CHAIN (l))
       {
 	/* C++ FE uses TREE_PURPOSE to store initial values.  */
@@ -14325,7 +14326,8 @@ get_range_pos_neg (tree arg)
   if (TREE_CODE (arg) != SSA_NAME)
     return 3;
   value_range r;
-  while (!get_global_range_query ()->range_of_expr (r, arg) || r.kind () != VR_RANGE)
+  while (!get_global_range_query ()->range_of_expr (r, arg)
+	 || r.undefined_p () || r.varying_p ())
     {
       gimple *g = SSA_NAME_DEF_STMT (arg);
       if (is_gimple_assign (g)

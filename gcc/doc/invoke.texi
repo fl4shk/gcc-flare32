@@ -1227,7 +1227,8 @@ See RS/6000 and PowerPC Options.
 -mbig-endian  -mlittle-endian
 -mstack-protector-guard=@var{guard}  -mstack-protector-guard-reg=@var{reg}
 -mstack-protector-guard-offset=@var{offset}
--mcsr-check -mno-csr-check}
+-mcsr-check -mno-csr-check
+-minline-atomics  -mno-inline-atomics}
 
 @emph{RL78 Options}
 @gccoptlist{-msim  -mmul=none  -mmul=g13  -mmul=g14  -mallregs
@@ -3494,6 +3495,8 @@ defined in the C++ standard; basically, a value that can be
 represented in the minimum number of bits needed to represent all the
 enumerators).  This assumption may not be valid if the program uses a
 cast to convert an arbitrary integer value to the enumerated type.
+This option has no effect for an enumeration type with a fixed underlying
+type.
 
 @opindex fstrong-eval-order
 @item -fstrong-eval-order
@@ -12454,8 +12457,8 @@ Attempt to remove redundant extension instructions.  This is especially
 helpful for the x86-64 architecture, which implicitly zero-extends in 64-bit
 registers after writing to their lower 32-bit half.
 
-Enabled for Alpha, AArch64 and x86 at levels @option{-O2},
-@option{-O3}, @option{-Os}.
+Enabled for Alpha, AArch64, PowerPC, RISC-V, SPARC, h83000 and x86 at levels
+@option{-O2}, @option{-O3}, @option{-Os}.
 
 @opindex fno-lifetime-dse
 @opindex flifetime-dse
@@ -15987,14 +15990,8 @@ The maximum number of may-defs we analyze when looking for a must-def
 specifying the dynamic type of an object that invokes a virtual call
 we may be able to devirtualize speculatively.
 
-@item evrp-sparse-threshold
-Maximum number of basic blocks before EVRP uses a sparse cache.
-
 @item ranger-debug
 Specifies the type of debug output to be issued for ranges.
-
-@item evrp-switch-limit
-Specifies the maximum number of switch cases before EVRP ignores a switch.
 
 @item unroll-jam-min-percent
 The minimum percentage of memory references that must be optimized
@@ -16053,6 +16050,15 @@ this parameter.  The default value of this parameter is 50.
 
 @item vect-induction-float
 Enable loop vectorization of floating point inductions.
+
+@item vrp-sparse-threshold
+Maximum number of basic blocks before VRP uses a sparse bitmap cache.
+
+@item vrp-switch-limit
+Maximum number of outgoing edges in a switch before VRP will not process it.
+
+@item vrp-vector-threshold
+Maximum number of basic blocks for VRP to use a basic cache vector.
 
 @item avoid-fma-max-bits
 Maximum number of bits for which we avoid creating FMAs.
@@ -18302,6 +18308,8 @@ Use it to conform to a non-default application binary interface.
 Allocate to an @code{enum} type only as many bytes as it needs for the
 declared range of possible values.  Specifically, the @code{enum} type
 is equivalent to the smallest integer type that has enough room.
+This option has no effect for an enumeration type with a fixed underlying
+type.
 
 @strong{Warning:} the @option{-fshort-enums} switch causes GCC to generate
 code that is not binary compatible with code generated without that switch.
@@ -20814,12 +20822,14 @@ run-time performance.  The default is 32KB when using OpenACC or OpenMP, and
 1MB otherwise.
 
 @opindex mxnack
-@item -mxnack
-Compile binaries suitable for devices with the XNACK feature enabled.  Some
-devices always require XNACK and some allow the user to configure XNACK.  The
-compiled code must match the device mode.  The default is @samp{-mno-xnack}.
-At present this option is a placeholder for support that is not yet
-implemented.
+@item -mxnack=on
+@itemx -mxnack=off
+@itemx -mxnack=any
+Compile binaries suitable for devices with the XNACK feature enabled, disabled,
+or either mode.  Some devices always require XNACK and some allow the user to
+configure XNACK.  The compiled code must match the device mode.
+@c The default is @samp{-mxnack=any}.
+At present this option is a placeholder for support that is not yet implemented.
 
 @end table
 
@@ -29023,6 +29033,13 @@ Put global and static data smaller than @var{n} bytes into a special section
 Do or don't use smaller but slower prologue and epilogue code that uses
 library function calls.  The default is to use fast inline prologues and
 epilogues.
+
+@opindex minline-atomics
+@item -minline-atomics
+@itemx -mno-inline-atomics
+Do or don't use smaller but slower subword atomic emulation code that uses
+libatomic function calls.  The default is to use fast inline subword atomics
+that do not require libatomic.
 
 @opindex mshorten-memrefs
 @item -mshorten-memrefs

@@ -492,7 +492,6 @@ package body Sem_Res is
          Name := Make_Identifier (Loc, Chars (Callee));
 
          if Is_Derived_Type (Typ)
-           and then Is_Tagged_Type (Typ)
            and then Base_Type (Etype (Callee)) /= Base_Type (Typ)
          then
             Callee :=
@@ -2938,7 +2937,7 @@ package body Sem_Res is
             --  view-swapping mechanism has no identifier.
 
             elsif (In_Instance or else In_Inlined_Body)
-              and then (Nkind (N) = N_Null)
+              and then Nkind (N) = N_Null
               and then Is_Private_Type (Typ)
               and then Is_Access_Type (Full_View (Typ))
             then
@@ -6038,11 +6037,11 @@ package body Sem_Res is
    --  Start of processing for Resolve_Arithmetic_Op
 
    begin
-      if Comes_From_Source (N)
-        and then Ekind (Entity (N)) = E_Function
+      if Ekind (Entity (N)) = E_Function
         and then Is_Imported (Entity (N))
         and then Is_Intrinsic_Subprogram (Entity (N))
       then
+         Generate_Reference (Entity (N), N);
          Resolve_Intrinsic_Operator (N, Typ);
          return;
 
@@ -6306,11 +6305,11 @@ package body Sem_Res is
             begin
                Determine_Range
                  (Left_Opnd (N), OK, Lo, Hi, Assume_Valid => True);
-               LNeg := (not OK) or else Lo < 0;
+               LNeg := not OK or else Lo < 0;
 
                Determine_Range
                  (Right_Opnd (N), OK, Lo, Hi, Assume_Valid => True);
-               RNeg := (not OK) or else Lo < 0;
+               RNeg := not OK or else Lo < 0;
 
                --  Check if we will be generating conditionals. There are two
                --  cases where that can happen, first for REM, the only case
@@ -7833,6 +7832,14 @@ package body Sem_Res is
       --  Determine whether Expr is part of an N_Attribute_Reference
       --  expression.
 
+      function In_Attribute_Old (Expr : Node_Id) return Boolean;
+      --  Determine whether Expr is in attribute Old
+
+      function Within_Exceptional_Cases_Consequence
+        (Expr : Node_Id)
+         return Boolean;
+      --  Determine whether Expr is part of an Exceptional_Cases consequence
+
       ----------------------------------------
       -- Is_Assignment_Or_Object_Expression --
       ----------------------------------------
@@ -7874,6 +7881,31 @@ package body Sem_Res is
          end if;
       end Is_Assignment_Or_Object_Expression;
 
+      ----------------------
+      -- In_Attribute_Old --
+      ----------------------
+
+      function In_Attribute_Old (Expr : Node_Id) return Boolean is
+         N : Node_Id := Expr;
+      begin
+         while Present (N) loop
+            if Nkind (N) = N_Attribute_Reference
+              and then Attribute_Name (N) = Name_Old
+            then
+               return True;
+
+            --  Prevent the search from going too far
+
+            elsif Is_Body_Or_Package_Declaration (N) then
+               return False;
+            end if;
+
+            N := Parent (N);
+         end loop;
+
+         return False;
+      end In_Attribute_Old;
+
       -----------------------------
       -- Is_Attribute_Expression --
       -----------------------------
@@ -7896,6 +7928,39 @@ package body Sem_Res is
 
          return False;
       end Is_Attribute_Expression;
+
+      ------------------------------------------
+      -- Within_Exceptional_Cases_Consequence --
+      ------------------------------------------
+
+      function Within_Exceptional_Cases_Consequence
+        (Expr : Node_Id)
+         return Boolean
+      is
+         Context : Node_Id := Parent (Expr);
+      begin
+         while Present (Context) loop
+            if Nkind (Context) = N_Pragma then
+
+               --  In Exceptional_Cases references to formal parameters are
+               --  only allowed within consequences, so it is enough to
+               --  recognize the pragma itself.
+
+               if Get_Pragma_Id (Context) = Pragma_Exceptional_Cases then
+                  return True;
+               end if;
+
+            --  Prevent the search from going too far
+
+            elsif Is_Body_Or_Package_Declaration (Context) then
+               return False;
+            end if;
+
+            Context := Parent (Context);
+         end loop;
+
+         return False;
+      end Within_Exceptional_Cases_Consequence;
 
       --  Local variables
 
@@ -8023,7 +8088,7 @@ package body Sem_Res is
 
       if Comes_From_Source (N) then
 
-         --  The following checks are only relevant when SPARK_Mode is on as
+         --  The following checks are only relevant when SPARK_Mode is On as
          --  they are not standard Ada legality rules.
 
          if SPARK_Mode = On then
@@ -8039,6 +8104,30 @@ package body Sem_Res is
                SPARK_Msg_N
                  ("volatile object cannot appear in this context "
                   & "(SPARK RM 7.1.3(10))", N);
+            end if;
+
+            --  Parameters of modes OUT or IN OUT of the subprogram shall not
+            --  occur in the consequences of an exceptional contract unless
+            --  they are either passed by reference or occur in the prefix
+            --  of a reference to the 'Old attribute.
+
+            if Ekind (E) in E_Out_Parameter | E_In_Out_Parameter
+              and then Within_Exceptional_Cases_Consequence (N)
+              and then not In_Attribute_Old (N)
+              and then not Is_By_Reference_Type (Etype (E))
+              and then not Is_Aliased (E)
+            then
+               if Ekind (E) = E_Out_Parameter then
+                  Error_Msg_N
+                    ("formal parameter of mode `OUT` cannot appear " &
+                       "in consequence of Exceptional_Cases", N);
+               else
+                  Error_Msg_N
+                    ("formal parameter of mode `IN OUT` cannot appear " &
+                       "in consequence of Exceptional_Cases", N);
+               end if;
+               Error_Msg_N
+                 ("\only parameters passed by reference are allowed", N);
             end if;
 
             --  Check for possible elaboration issues with respect to reads of
@@ -8068,13 +8157,11 @@ package body Sem_Res is
          if Is_Ghost_Entity (E) then
             Check_Ghost_Context (E, N);
          end if;
-      end if;
 
-      --  We may be resolving an entity within expanded code, so a reference to
-      --  an entity should be ignored when calculating effective use clauses to
-      --  avoid inappropriate marking.
+         --  We may be resolving an entity within expanded code, so a reference
+         --  to an entity should be ignored when calculating effective use
+         --  clauses to avoid inappropriate marking.
 
-      if Comes_From_Source (N) then
          Mark_Use_Clauses (E);
       end if;
    end Resolve_Entity_Name;
@@ -9713,10 +9800,19 @@ package body Sem_Res is
    --------------------------------
 
    procedure Resolve_Intrinsic_Operator  (N : Node_Id; Typ : Entity_Id) is
-      Btyp : constant Entity_Id := Base_Type (Underlying_Type (Typ));
-      Op   : Entity_Id;
-      Arg1 : Node_Id;
-      Arg2 : Node_Id;
+      Is_Stoele_Mod : constant Boolean :=
+        Nkind (N) = N_Op_Mod
+          and then Is_RTE (First_Subtype (Typ), RE_Storage_Offset)
+          and then Is_RTE (Etype (Left_Opnd (N)), RE_Address);
+      --  True if this is the special mod operator of System.Storage_Elements,
+      --  which needs to be resolved to the type of the left operand in order
+      --  to implement the correct semantics.
+
+      Btyp : constant Entity_Id :=
+        (if Is_Stoele_Mod
+          then Implementation_Base_Type (Etype (Left_Opnd (N)))
+          else Implementation_Base_Type (Typ));
+      --  The base type to be used for the operator
 
       function Convert_Operand (Opnd : Node_Id) return Node_Id;
       --  If the operand is a literal, it cannot be the expression in a
@@ -9745,6 +9841,12 @@ package body Sem_Res is
          return Res;
       end Convert_Operand;
 
+      --  Local variables
+
+      Arg1 : Node_Id;
+      Arg2 : Node_Id;
+      Op   : Entity_Id;
+
    --  Start of processing for Resolve_Intrinsic_Operator
 
    begin
@@ -9766,11 +9868,13 @@ package body Sem_Res is
 
       --  If the result or operand types are private, rewrite with unchecked
       --  conversions on the operands and the result, to expose the proper
-      --  underlying numeric type.
+      --  underlying numeric type. Likewise for the special mod operator of
+      --  System.Storage_Elements, to expose the modified base type.
 
       if Is_Private_Type (Typ)
         or else Is_Private_Type (Etype (Left_Opnd (N)))
         or else Is_Private_Type (Etype (Right_Opnd (N)))
+        or else Is_Stoele_Mod
       then
          Arg1 := Convert_Operand (Left_Opnd (N));
 
@@ -10644,11 +10748,11 @@ package body Sem_Res is
          end if;
       end if;
 
-      if Comes_From_Source (N)
-        and then Ekind (Entity (N)) = E_Function
+      if Ekind (Entity (N)) = E_Function
         and then Is_Imported (Entity (N))
         and then Is_Intrinsic_Subprogram (Entity (N))
       then
+         Generate_Reference (Entity (N), N);
          Resolve_Intrinsic_Operator (N, Typ);
          return;
       end if;
@@ -10917,14 +11021,14 @@ package body Sem_Res is
             if not Parentheses_Found
               and then Comes_From_Source (Par)
               and then
-                ((Nkind (Par) in N_Modular_Type_Definition
-                               | N_Floating_Point_Definition
-                               | N_Ordinary_Fixed_Point_Definition
-                               | N_Decimal_Fixed_Point_Definition
-                               | N_Extension_Aggregate
-                               | N_Discriminant_Specification
-                               | N_Parameter_Specification
-                               | N_Formal_Object_Declaration)
+                (Nkind (Par) in N_Modular_Type_Definition
+                              | N_Floating_Point_Definition
+                              | N_Ordinary_Fixed_Point_Definition
+                              | N_Decimal_Fixed_Point_Definition
+                              | N_Extension_Aggregate
+                              | N_Discriminant_Specification
+                              | N_Parameter_Specification
+                              | N_Formal_Object_Declaration
 
                   or else (Nkind (Par) = N_Object_Declaration
                     and then
@@ -13230,8 +13334,8 @@ package body Sem_Res is
          --  For other operators the context does not impose a type on
          --  the operands, but their types must match.
 
-         if (Nkind (Left_Opnd (N))
-           not in N_Integer_Literal | N_String_Literal | N_Real_Literal)
+         if Nkind (Left_Opnd (N))
+           not in N_Integer_Literal | N_String_Literal | N_Real_Literal
          and then
            Has_Applicable_User_Defined_Literal
              (Right_Opnd (N), Etype (Left_Opnd (N)))
@@ -13239,8 +13343,8 @@ package body Sem_Res is
             Analyze_And_Resolve (N, Typ);
             return True;
 
-         elsif (Nkind (Right_Opnd (N))
-           not in N_Integer_Literal | N_String_Literal | N_Real_Literal)
+         elsif Nkind (Right_Opnd (N))
+           not in N_Integer_Literal | N_String_Literal | N_Real_Literal
          and then
            Has_Applicable_User_Defined_Literal
              (Left_Opnd (N), Etype (Right_Opnd (N)))
@@ -13544,8 +13648,8 @@ package body Sem_Res is
 
          --  return False if Expr not of form <prefix>.all.Some_Component
 
-         if (Nkind (Expr) /= N_Selected_Component)
-           or else (Nkind (Prefix (Expr)) /= N_Explicit_Dereference)
+         if Nkind (Expr) /= N_Selected_Component
+           or else Nkind (Prefix (Expr)) /= N_Explicit_Dereference
          then
             --  conditional expressions, declare expressions ???
             return False;
@@ -13629,8 +13733,8 @@ package body Sem_Res is
 
                if not (Is_Integer_Type (Target_Index_Type)
                        and then Is_Integer_Type (Opnd_Index_Type))
-                 and then (Root_Type (Target_Index_Type)
-                           /= Root_Type (Opnd_Index_Type))
+                 and then Root_Type (Target_Index_Type)
+                          /= Root_Type (Opnd_Index_Type)
                then
                   Conversion_Error_N
                     ("incompatible index types for array conversion",

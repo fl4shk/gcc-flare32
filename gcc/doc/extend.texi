@@ -1705,6 +1705,9 @@ struct line *thisline = (struct line *)
 thisline->length = this_length;
 @end smallexample
 
+In this example, @code{thisline->contents} is an array of @code{char} that
+can hold up to @code{thisline->length} bytes.
+
 Although the size of a zero-length array is zero, an array member of
 this kind may increase the size of the enclosing type as a result of tail
 padding.  The offset of a zero-length array member from the beginning
@@ -14682,6 +14685,7 @@ instructions, but allow the compiler to schedule those calls.
 * Other MIPS Built-in Functions::
 * MSP430 Built-in Functions::
 * NDS32 Built-in Functions::
+* Nvidia PTX Built-in Functions::
 * Basic PowerPC Built-in Functions::
 * PowerPC AltiVec/VSX Built-in Functions::
 * PowerPC Hardware Transactional Memory Built-in Functions::
@@ -17941,6 +17945,20 @@ Enable global interrupt.
 Disable global interrupt.
 @enddefbuiltin
 
+@node Nvidia PTX Built-in Functions
+@subsection Nvidia PTX Built-in Functions
+
+These built-in functions are available for the Nvidia PTX target:
+
+@defbuiltin{unsigned int __builtin_nvptx_brev (unsigned int @var{x})}
+Reverse the bit order of a 32-bit unsigned integer.
+Disable global interrupt.
+@enddefbuiltin
+
+@defbuiltin{unsigned long long __builtin_nvptx_brevll (unsigned long long @var{x})}
+Reverse the bit order of a 64-bit unsigned integer.
+@enddefbuiltin
+
 @node Basic PowerPC Built-in Functions
 @subsection Basic PowerPC Built-in Functions
 
@@ -19736,7 +19754,10 @@ bool scalar_test_neg (double source);
 bool scalar_test_neg (__ieee128 source);
 @end smallexample
 
-The @code{scalar_extract_exp} and @code{scalar_extract_sig}
+The @code{scalar_extract_exp} with a 64-bit source argument
+function requires an environment supporting ISA 3.0 or later.
+The @code{scalar_extract_exp} with a 128-bit source argument
+and @code{scalar_extract_sig}
 functions require a 64-bit environment supporting ISA 3.0 or later.
 The @code{scalar_extract_exp} and @code{scalar_extract_sig} built-in
 functions return the significand and the biased exponent value
@@ -25454,12 +25475,12 @@ assumption is valid. For example, @code{assume(n > 0)}.
 @item axiom
 Introduces an axiom definition. Axioms introduce requirements on values.
 
-@kindex axiom
+@kindex forall
 @item forall
 Introduces a universally quantified object in an axiom. For example,
-@code{forall (int n) n + 0 == n}).
+@code{forall (int n) n + 0 == n}.
 
-@kindex axiom
+@kindex concept
 @item concept
 Introduces a concept definition. Concepts are sets of syntactic and semantic
 requirements on types and their values.

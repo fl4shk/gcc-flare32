@@ -446,7 +446,11 @@ package body Sem_Ch7 is
                   else
                      Decl_Id := Defining_Entity (Decl);
 
+                     --  See the N_Subprogram_Declaration case below
+
                      if not Set_Referencer_Of_Non_Subprograms
+                       and then (not In_Nested_Instance
+                                  or else not Subprogram_Table.Get_First)
                        and then not Subprogram_Table.Get (Decl_Id)
                      then
                         --  We can reset Is_Public right away
@@ -893,6 +897,9 @@ package body Sem_Ch7 is
       --  current node otherwise. Note that N was rewritten above, so we must
       --  be sure to get the latest Body_Id value.
 
+      if Ekind (Body_Id) = E_Package then
+         Reinit_Field_To_Zero (Body_Id, F_Body_Needed_For_Inlining);
+      end if;
       Mutate_Ekind (Body_Id, E_Package_Body);
       Set_Body_Entity (Spec_Id, Body_Id);
       Set_Spec_Entity (Body_Id, Spec_Id);
@@ -1180,6 +1187,8 @@ package body Sem_Ch7 is
       Generate_Definition (Id);
       Enter_Name (Id);
       Mutate_Ekind  (Id, E_Package);
+      Set_Is_Not_Self_Hidden (Id);
+      --  Needed early because of Set_Categorization_From_Pragmas below
       Set_Etype  (Id, Standard_Void_Type);
 
       --  Set SPARK_Mode from context
@@ -1925,6 +1934,20 @@ package body Sem_Ch7 is
                      & "preelaborable initialization", E);
                end if;
             end;
+         end if;
+
+         --  Preanalyze class-wide conditions of dispatching primitives defined
+         --  in nested packages. For library packages, class-wide pre- and
+         --  postconditions are preanalyzed when the primitives are frozen
+         --  (see Merge_Class_Conditions); for nested packages, the end of the
+         --  package does not cause freezing (and hence they must be analyzed
+         --  now to ensure the correct visibility of referenced entities).
+
+         if not Is_Compilation_Unit (Id)
+           and then Is_Dispatching_Operation (E)
+           and then Present (Contract (E))
+         then
+            Preanalyze_Class_Conditions (E);
          end if;
 
          Next_Entity (E);
@@ -2720,10 +2743,11 @@ package body Sem_Ch7 is
          Mutate_Ekind (Id, E_Private_Type);
       end if;
 
-      Set_Etype              (Id, Id);
+      Set_Is_Not_Self_Hidden (Id);
+      Set_Etype (Id, Id);
       Set_Has_Delayed_Freeze (Id);
-      Set_Is_First_Subtype   (Id);
-      Reinit_Size_Align      (Id);
+      Set_Is_First_Subtype (Id);
+      Reinit_Size_Align (Id);
 
       Set_Is_Constrained (Id,
         No (Discriminant_Specifications (N))
@@ -3187,10 +3211,6 @@ package body Sem_Ch7 is
             --  is simply that the initializing expression is missing.
 
             if not Has_Private_Declaration (Etype (Id)) then
-
-               --  We assume that the user did not intend a deferred constant
-               --  declaration, and the expression is just missing.
-
                Error_Msg_N
                  ("constant declaration requires initialization expression",
                    Parent (Id));

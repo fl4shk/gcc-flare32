@@ -251,7 +251,7 @@ static cp_token_cache *cp_token_cache_new
 static tree cp_parser_late_noexcept_specifier
   (cp_parser *, tree);
 static void noexcept_override_late_checks
-  (tree, tree);
+  (tree);
 
 static void cp_parser_initial_pragma
   (cp_token *);
@@ -26458,7 +26458,7 @@ cp_parser_class_specifier (cp_parser* parser)
 	  /* The finish_struct call above performed various override checking,
 	     but it skipped unparsed noexcept-specifier operands.  Now that we
 	     have resolved them, check again.  */
-	  noexcept_override_late_checks (type, decl);
+	  noexcept_override_late_checks (decl);
 
 	  /* Remove any member-function parameters from the symbol table.  */
 	  pop_injected_parms ();
@@ -28240,14 +28240,13 @@ cp_parser_late_noexcept_specifier (cp_parser *parser, tree default_arg)
 }
 
 /* Perform late checking of overriding function with respect to their
-   noexcept-specifiers.  TYPE is the class and FNDECL is the function
-   that potentially overrides some virtual function with the same
-   signature.  */
+   noexcept-specifiers.  FNDECL is the member function that potentially
+   overrides some virtual function with the same signature.  */
 
 static void
-noexcept_override_late_checks (tree type, tree fndecl)
+noexcept_override_late_checks (tree fndecl)
 {
-  tree binfo = TYPE_BINFO (type);
+  tree binfo = TYPE_BINFO (DECL_CONTEXT (fndecl));
   tree base_binfo;
 
   if (DECL_STATIC_FUNCTION_P (fndecl))
@@ -29468,9 +29467,12 @@ cp_parser_std_attribute (cp_parser *parser, tree attr_ns)
 	  }
 
 	/* For unknown attributes, just skip balanced tokens instead of
-	   trying to parse the arguments.  */
+	   trying to parse the arguments.  Set TREE_VALUE (attribute) to
+	   error_mark_node to distinguish skipped arguments from attributes
+	   with no arguments.  */
 	for (size_t n = cp_parser_skip_balanced_tokens (parser, 1) - 1; n; --n)
 	  cp_lexer_consume_token (parser->lexer);
+	TREE_VALUE (attribute) = error_mark_node;
 	return attribute;
       }
 
@@ -29562,7 +29564,13 @@ cp_parser_std_attribute_list (cp_parser *parser, tree attr_ns)
 	  if (attribute == NULL_TREE)
 	    error_at (token->location,
 		      "expected attribute before %<...%>");
-	  else
+	  else if (TREE_VALUE (attribute) == NULL_TREE)
+	    {
+	      error_at (token->location, "attribute with no arguments "
+					 "contains no parameter packs");
+	      return error_mark_node;
+	    }
+	  else if (TREE_VALUE (attribute) != error_mark_node)
 	    {
 	      tree pack = make_pack_expansion (TREE_VALUE (attribute));
 	      if (pack == error_mark_node)
@@ -43553,19 +43561,29 @@ static void
 cp_parser_omp_scan_loop_body (cp_parser *parser)
 {
   tree substmt, clauses = NULL_TREE;
+  bool found_scan = false;
 
   matching_braces braces;
   if (!braces.require_open (parser))
     return;
 
-  substmt = cp_parser_omp_structured_block_sequence (parser, PRAGMA_OMP_SCAN);
+  cp_token *tok = cp_lexer_peek_token (parser->lexer);
+  if (cp_parser_pragma_kind (tok) != PRAGMA_OMP_SCAN)
+    substmt = cp_parser_omp_structured_block_sequence (parser, PRAGMA_OMP_SCAN);
+  else
+    {
+      warning_at (tok->location, 0, "%<#pragma omp scan%> with zero preceding "
+				    "executable statements");
+      substmt = build_empty_stmt (tok->location);
+    }
   substmt = build2 (OMP_SCAN, void_type_node, substmt, NULL_TREE);
   add_stmt (substmt);
 
-  cp_token *tok = cp_lexer_peek_token (parser->lexer);
+  tok = cp_lexer_peek_token (parser->lexer);
   if (cp_parser_pragma_kind (tok) == PRAGMA_OMP_SCAN)
     {
       enum omp_clause_code clause = OMP_CLAUSE_ERROR;
+      found_scan = true;
 
       cp_lexer_consume_token (parser->lexer);
 
@@ -43596,7 +43614,15 @@ cp_parser_omp_scan_loop_body (cp_parser *parser)
     error ("expected %<#pragma omp scan%>");
 
   clauses = finish_omp_clauses (clauses, C_ORT_OMP);
-  substmt = cp_parser_omp_structured_block_sequence (parser, PRAGMA_NONE);
+  if (!cp_lexer_next_token_is (parser->lexer, CPP_CLOSE_BRACE))
+    substmt = cp_parser_omp_structured_block_sequence (parser, PRAGMA_NONE);
+  else
+    {
+      if (found_scan)
+	warning_at (tok->location, 0, "%<#pragma omp scan%> with zero "
+				      "succeeding executable statements");
+      substmt = build_empty_stmt (tok->location);
+    }
   substmt = build2_loc (tok->location, OMP_SCAN, void_type_node, substmt,
 			clauses);
   add_stmt (substmt);

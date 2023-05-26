@@ -1555,7 +1555,6 @@ package body Freeze is
          Par_Prim     : Entity_Id;
          Wrapped_Subp : Entity_Id) return Node_Id
       is
-         Par_Typ    : constant Entity_Id := Find_Dispatching_Type (Par_Prim);
          Actuals    : constant List_Id   := Empty_List;
          Call       : Node_Id;
          Formal     : Entity_Id := First_Formal (Par_Prim);
@@ -1571,12 +1570,10 @@ package body Freeze is
             --  If the controlling argument is inherited, add conversion to
             --  parent type for the call.
 
-            if Etype (Formal) = Par_Typ
-              and then Is_Controlling_Formal (Formal)
-            then
+            if Is_Controlling_Formal (Formal) then
                Append_To (Actuals,
                  Make_Type_Conversion (Loc,
-                   New_Occurrence_Of (Par_Typ, Loc),
+                   New_Occurrence_Of (Etype (Formal), Loc),
                    New_Occurrence_Of (New_Formal, Loc)));
             else
                Append_To (Actuals, New_Occurrence_Of (New_Formal, Loc));
@@ -1904,8 +1901,8 @@ package body Freeze is
                      if Iface_Prim /= Par_Prim
                        and then Chars (Iface_Prim) = Chars (Prim)
                        and then Comes_From_Source (Iface_Prim)
-                       and then (Is_Interface_Conformant
-                                   (R, Iface_Prim, Prim))
+                       and then Is_Interface_Conformant
+                                  (R, Iface_Prim, Prim)
                      then
                         Check_Same_Strub_Mode (Prim, Iface_Prim);
                      end if;
@@ -5500,7 +5497,7 @@ package body Freeze is
 
             if Warn_On_Redundant_Constructs then
                Error_Msg_N -- CODEFIX
-                 ("??pragma Pack has no effect, no unplaced components",
+                 ("?r?pragma Pack has no effect, no unplaced components",
                   Get_Rep_Pragma (Rec, Name_Pack));
             end if;
          end if;
@@ -6127,8 +6124,7 @@ package body Freeze is
 
             Bod :=
               Make_Subprogram_Body (Loc,
-                Specification              =>
-                  Copy_Separate_Tree (Spec),
+                Specification              => Copy_Subprogram_Spec (Spec),
                 Declarations               => New_List (
                   Make_Subprogram_Declaration (Loc,
                     Specification => Copy_Separate_Tree (Spec)),
@@ -6438,7 +6434,9 @@ package body Freeze is
 
             --  Check for needing to wrap imported subprogram
 
-            Wrap_Imported_Subprogram (E);
+            if not Inside_A_Generic then
+               Wrap_Imported_Subprogram (E);
+            end if;
 
             --  Freeze all parameter types and the return type (RM 13.14(14)).
             --  However skip this for internal subprograms. This is also where
@@ -7286,10 +7284,20 @@ package body Freeze is
          elsif Is_Integer_Type (E) then
             Adjust_Esize_For_Alignment (E);
 
-            if Is_Modular_Integer_Type (E)
-              and then Warn_On_Suspicious_Modulus_Value
-            then
-               Check_Suspicious_Modulus (E);
+            if Is_Modular_Integer_Type (E) then
+               --  Standard_Address has been built with the assumption that its
+               --  modulus was System_Address_Size, but this is not a universal
+               --  property and may need to be corrected.
+
+               if Is_RTE (E, RE_Address) then
+                  Set_Modulus (Standard_Address, Modulus (E));
+                  Set_Intval
+                    (High_Bound (Scalar_Range (Standard_Address)),
+                     Modulus (E) - 1);
+
+               elsif Warn_On_Suspicious_Modulus_Value then
+                  Check_Suspicious_Modulus (E);
+               end if;
             end if;
 
          --  The pool applies to named and anonymous access types, but not
@@ -8284,7 +8292,7 @@ package body Freeze is
 
       if Desig_Typ /= Empty
         and then (Is_Frozen (Desig_Typ)
-                   or else (not Is_Fully_Defined (Desig_Typ)))
+                   or else not Is_Fully_Defined (Desig_Typ))
       then
          Desig_Typ := Empty;
       end if;
@@ -8427,7 +8435,7 @@ package body Freeze is
 
                   if not In_Spec_Expression
                     and then Nkind (N) = N_Identifier
-                    and then (Present (Entity (N)))
+                    and then Present (Entity (N))
                   then
                      --  We recognize the discriminant case by just looking for
                      --  a reference to a discriminant. It can only be one for
@@ -8712,17 +8720,19 @@ package body Freeze is
 
             --  The current scope may be that of a constrained component of
             --  an enclosing record declaration, or of a loop of an enclosing
-            --  quantified expression, which is above the current scope in the
-            --  scope stack. Indeed in the context of a quantified expression,
-            --  a scope is created and pushed above the current scope in order
-            --  to emulate the loop-like behavior of the quantified expression.
+            --  quantified expression or aggregate with an iterated component
+            --  in Ada 2022, which is above the current scope in the scope
+            --  stack. Indeed in the context of a quantified expression or
+            --  an aggregate with an iterated component, an internal scope is
+            --  created and pushed above the current scope in order to emulate
+            --  the loop-like behavior of the construct.
             --  If the expression is within a top-level pragma, as for a pre-
             --  condition on a library-level subprogram, nothing to do.
 
             if not Is_Compilation_Unit (Current_Scope)
               and then (Is_Record_Type (Scope (Current_Scope))
-                         or else Nkind (Parent (Current_Scope)) =
-                                                     N_Quantified_Expression)
+                         or else (Ekind (Current_Scope) = E_Loop
+                                   and then Is_Internal (Current_Scope)))
             then
                Pos := Pos - 1;
             end if;

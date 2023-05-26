@@ -1103,6 +1103,148 @@ AC_DEFUN([GLIBCXX_ENABLE_C99], [
       ])
     fi
 
+    # Check for the existence of <stdint.h> types.
+    AC_CACHE_CHECK([for ISO C99 support in <stdint.h> for C++11],
+    glibcxx_cv_c99_stdint, [
+    AC_TRY_COMPILE([#define __STDC_LIMIT_MACROS
+		    #define __STDC_CONSTANT_MACROS
+		    #include <stdint.h>],
+		   [typedef int8_t          my_int8_t;
+		    my_int8_t               i8 = INT8_MIN;
+		    i8 = INT8_MAX;
+		    typedef int16_t         my_int16_t;
+		    my_int16_t              i16 = INT16_MIN;
+		    i16 = INT16_MAX;
+		    typedef int32_t         my_int32_t;
+		    my_int32_t              i32 = INT32_MIN;
+		    i32 = INT32_MAX;
+		    typedef int64_t         my_int64_t;
+		    my_int64_t              i64 = INT64_MIN;
+		    i64 = INT64_MAX;
+		    typedef int_fast8_t     my_int_fast8_t;
+		    my_int_fast8_t          if8 = INT_FAST8_MIN;
+		    if8 = INT_FAST8_MAX;
+		    typedef int_fast16_t    my_int_fast16_t;
+		    my_int_fast16_t         if16 = INT_FAST16_MIN;
+		    if16 = INT_FAST16_MAX;
+		    typedef int_fast32_t    my_int_fast32_t;
+		    my_int_fast32_t         if32 = INT_FAST32_MIN;
+		    if32 = INT_FAST32_MAX;
+		    typedef int_fast64_t    my_int_fast64_t;
+		    my_int_fast64_t         if64 = INT_FAST64_MIN;
+		    if64 = INT_FAST64_MAX;
+		    typedef int_least8_t    my_int_least8_t;
+		    my_int_least8_t         il8 = INT_LEAST8_MIN;
+		    il8 = INT_LEAST8_MAX;
+		    typedef int_least16_t   my_int_least16_t;
+		    my_int_least16_t        il16 = INT_LEAST16_MIN;
+		    il16 = INT_LEAST16_MAX;
+		    typedef int_least32_t   my_int_least32_t;
+		    my_int_least32_t        il32 = INT_LEAST32_MIN;
+		    il32 = INT_LEAST32_MAX;
+		    typedef int_least64_t   my_int_least64_t;
+		    my_int_least64_t        il64 = INT_LEAST64_MIN;
+		    il64 = INT_LEAST64_MAX;
+		    typedef intmax_t        my_intmax_t;
+		    my_intmax_t             im = INTMAX_MAX;
+		    im = INTMAX_MIN;
+		    typedef intptr_t        my_intptr_t;
+		    my_intptr_t             ip = INTPTR_MAX;
+		    ip = INTPTR_MIN;
+		    typedef uint8_t         my_uint8_t;
+		    my_uint8_t              ui8 = UINT8_MAX;
+		    ui8 = UINT8_MAX;
+		    typedef uint16_t        my_uint16_t;
+		    my_uint16_t             ui16 = UINT16_MAX;
+		    ui16 = UINT16_MAX;
+		    typedef uint32_t        my_uint32_t;
+		    my_uint32_t             ui32 = UINT32_MAX;
+		    ui32 = UINT32_MAX;
+		    typedef uint64_t        my_uint64_t;
+		    my_uint64_t             ui64 = UINT64_MAX;
+		    ui64 = UINT64_MAX;
+		    typedef uint_fast8_t    my_uint_fast8_t;
+		    my_uint_fast8_t         uif8 = UINT_FAST8_MAX;
+		    uif8 = UINT_FAST8_MAX;
+		    typedef uint_fast16_t   my_uint_fast16_t;
+		    my_uint_fast16_t        uif16 = UINT_FAST16_MAX;
+		    uif16 = UINT_FAST16_MAX;
+		    typedef uint_fast32_t   my_uint_fast32_t;
+		    my_uint_fast32_t        uif32 = UINT_FAST32_MAX;
+		    uif32 = UINT_FAST32_MAX;
+		    typedef uint_fast64_t   my_uint_fast64_t;
+		    my_uint_fast64_t        uif64 = UINT_FAST64_MAX;
+		    uif64 = UINT_FAST64_MAX;
+		    typedef uint_least8_t   my_uint_least8_t;
+		    my_uint_least8_t        uil8 = UINT_LEAST8_MAX;
+		    uil8 = UINT_LEAST8_MAX;
+		    typedef uint_least16_t  my_uint_least16_t;
+		    my_uint_least16_t       uil16 = UINT_LEAST16_MAX;
+		    uil16 = UINT_LEAST16_MAX;
+		    typedef uint_least32_t  my_uint_least32_t;
+		    my_uint_least32_t       uil32 = UINT_LEAST32_MAX;
+		    uil32 = UINT_LEAST32_MAX;
+		    typedef uint_least64_t  my_uint_least64_t;
+		    my_uint_least64_t       uil64 = UINT_LEAST64_MAX;
+		    uil64 = UINT_LEAST64_MAX;
+		    typedef uintmax_t       my_uintmax_t;
+		    my_uintmax_t            uim = UINTMAX_MAX;
+		    uim = UINTMAX_MAX;
+		    typedef uintptr_t       my_uintptr_t;
+		    my_uintptr_t            uip = UINTPTR_MAX;
+		    uip = UINTPTR_MAX;
+		   ],[glibcxx_cv_c99_stdint=yes],
+		     [glibcxx_cv_c99_stdint=no])
+    ])
+    if test x"$glibcxx_cv_c99_stdint" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_STDINT, 1,
+		[Define if C99 types in <stdint.h> should be imported in
+		<cstdint> in namespace std for C++11.])
+    fi
+
+    # Check for the existence of <inttypes.h> functions (NB: doesn't make
+    # sense if the glibcxx_cv_c99_stdint check fails, per C99, 7.8/1).
+    ac_c99_inttypes=no;
+    if test x"$glibcxx_cv_c99_stdint" = x"yes"; then
+      AC_MSG_CHECKING([for ISO C99 support for C++11 in <inttypes.h>])
+      AC_TRY_COMPILE([#include <inttypes.h>],
+		     [intmax_t i, numer, denom, base;
+		      const char* s;
+		      char** endptr;
+		      intmax_t ret = imaxabs(i);
+		      imaxdiv_t dret = imaxdiv(numer, denom);
+		      ret = strtoimax(s, endptr, base);
+		      uintmax_t uret = strtoumax(s, endptr, base);
+		     ],[ac_c99_inttypes=yes], [ac_c99_inttypes=no])
+      AC_MSG_RESULT($ac_c99_inttypes)
+    fi
+    if test x"$ac_c99_inttypes" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_INTTYPES, 1,
+		[Define if C99 functions in <inttypes.h> should be imported in
+		<cinttypes> in namespace std in C++11.])
+    fi
+
+    # Check for the existence of wchar_t <inttypes.h> functions (NB: doesn't
+    # make sense if the glibcxx_cv_c99_stdint check fails, per C99, 7.8/1).
+    ac_c99_inttypes_wchar_t=no;
+    if test x"$glibcxx_cv_c99_stdint" = x"yes"; then
+      AC_MSG_CHECKING([for wchar_t ISO C99 support for C++11 in <inttypes.h>])
+      AC_TRY_COMPILE([#include <inttypes.h>],
+		     [intmax_t base;
+		      const wchar_t* s;
+		      wchar_t** endptr;
+		      intmax_t ret = wcstoimax(s, endptr, base);
+		      uintmax_t uret = wcstoumax(s, endptr, base);
+		     ],[ac_c99_inttypes_wchar_t=yes],
+		       [ac_c99_inttypes_wchar_t=no])
+      AC_MSG_RESULT($ac_c99_inttypes_wchar_t)
+    fi
+    if test x"$ac_c99_inttypes_wchar_t" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_INTTYPES_WCHAR_T, 1,
+		[Define if wchar_t C99 functions in <inttypes.h> should be
+		imported in <cinttypes> in namespace std in C++11.])
+    fi
+
     # Check for the existence of <math.h> functions used if C99 is enabled.
     AC_CACHE_CHECK([for ISO C99 support in <math.h> for C++11],
     glibcxx_cv_c99_math_cxx11, [
@@ -1200,6 +1342,43 @@ AC_DEFUN([GLIBCXX_ENABLE_C99], [
         requires corresponding C99 library functions to be present.])
     fi
 
+    # Check for the existence of <complex.h> complex inverse trigonometric
+    # math functions used by <complex> for C++11 and later.
+    ac_c99_complex_arc=no;
+    if test x"$ac_has_complex_h" = x"yes"; then
+      AC_MSG_CHECKING([for ISO C99 support for inverse trig functions in <complex.h>])
+      AC_TRY_COMPILE([#include <complex.h>],
+		     [typedef __complex__ float float_type; float_type tmpf;
+		      cacosf(tmpf);
+		      casinf(tmpf);
+		      catanf(tmpf);
+		      cacoshf(tmpf);
+		      casinhf(tmpf);
+		      catanhf(tmpf);
+		      typedef __complex__ double double_type; double_type tmpd;
+		      cacos(tmpd);
+		      casin(tmpd);
+		      catan(tmpd);
+		      cacosh(tmpd);
+		      casinh(tmpd);
+		      catanh(tmpd);
+		      typedef __complex__ long double ld_type; ld_type tmpld;
+		      cacosl(tmpld);
+		      casinl(tmpld);
+		      catanl(tmpld);
+		      cacoshl(tmpld);
+		      casinhl(tmpld);
+		      catanhl(tmpld);
+		     ],[ac_c99_complex_arc=yes], [ac_c99_complex_arc=no])
+    fi
+    AC_MSG_RESULT($ac_c99_complex_arc)
+    if test x"$ac_c99_complex_arc" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_COMPLEX_ARC, 1,
+		[Define if C99 inverse trig functions in <complex.h> should be
+		used in <complex>. Using compiler builtins for these functions
+		requires corresponding C99 library functions to be present.])
+    fi
+
     # Check for the existence in <stdio.h> of vscanf, et. al.
     AC_CACHE_CHECK([for ISO C99 support in <stdio.h> for C++11],
       glibcxx_cv_c99_stdio_cxx11, [
@@ -1295,6 +1474,52 @@ AC_DEFUN([GLIBCXX_ENABLE_C99], [
           [Define if C99 functions or macros in <wchar.h> should be imported
           in <cwchar> in namespace std for C++11.])
       fi
+    fi
+
+    # Check for the existence of <ctype.h> functions.
+    AC_CACHE_CHECK([for ISO C99 support for C++11 in <ctype.h>],
+    glibcxx_cv_c99_ctype, [
+    AC_TRY_COMPILE([#include <ctype.h>],
+		   [int ch;
+		    int ret;
+		    ret = isblank(ch);
+		   ],[glibcxx_cv_c99_ctype=yes],
+		     [glibcxx_cv_c99_ctype=no])
+    ])
+    if test x"$glibcxx_cv_c99_ctype" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_CTYPE, 1,
+		[Define if C99 functions in <ctype.h> should be imported in
+		<cctype> in namespace std for C++11.])
+    fi
+
+    # Check for the existence of <fenv.h> functions.
+    AC_CHECK_HEADERS(fenv.h, ac_has_fenv_h=yes, ac_has_fenv_h=no)
+    ac_c99_fenv=no;
+    if test x"$ac_has_fenv_h" = x"yes"; then
+      AC_MSG_CHECKING([for ISO C99 support for C++11 in <fenv.h>])
+      AC_TRY_COMPILE([#include <fenv.h>],
+		     [int except, mode;
+		      fexcept_t* pflag;
+		      fenv_t* penv;
+		      int ret;
+		      ret = feclearexcept(except);
+		      ret = fegetexceptflag(pflag, except);
+		      ret = feraiseexcept(except);
+		      ret = fesetexceptflag(pflag, except);
+		      ret = fetestexcept(except);
+		      ret = fegetround();
+		      ret = fesetround(mode);
+		      ret = fegetenv(penv);
+		      ret = feholdexcept(penv);
+		      ret = fesetenv(penv);
+		      ret = feupdateenv(penv);
+		     ],[ac_c99_fenv=yes], [ac_c99_fenv=no])
+      AC_MSG_RESULT($ac_c99_fenv)
+    fi
+    if test x"$ac_c99_fenv" = x"yes"; then
+      AC_DEFINE(_GLIBCXX_USE_C99_FENV, 1,
+		[Define if C99 functions in <fenv.h> should be imported in
+		<cfenv> in namespace std for C++11.])
     fi
 
     gcc_no_link="$ac_save_gcc_no_link"
@@ -1620,7 +1845,7 @@ AC_DEFUN([GLIBCXX_CHECK_C99_TR1], [
   AC_LANG_SAVE
   AC_LANG_CPLUSPLUS
 
-  # Use -std=c++98 because the default (-std=gnu++98) leaves __STRICT_ANSI__
+  # Use -std=c++98 because -std=gnu++98 leaves __STRICT_ANSI__
   # undefined and fake C99 facilities may be spuriously enabled.
   ac_save_CXXFLAGS="$CXXFLAGS"
   CXXFLAGS="$CXXFLAGS -std=c++98"
@@ -1885,9 +2110,9 @@ AC_DEFUN([GLIBCXX_CHECK_C99_TR1], [
 		  lround(0.0);
 		  lroundf(0.0f);
 		  lroundl(0.0l);
-		  nan(0);
-		  nanf(0);
-		  nanl(0);
+		  nan("");
+		  nanf("");
+		  nanl("");
 		  nearbyint(0.0);
 		  nearbyintf(0.0f);
 		  nearbyintl(0.0l);
@@ -3841,7 +4066,7 @@ changequote([,])dnl
 fi
 
 # For libtool versioning info, format is CURRENT:REVISION:AGE
-libtool_VERSION=6:31:0
+libtool_VERSION=6:32:0
 
 # Everything parsed; figure out what files and settings to use.
 case $enable_symvers in
@@ -4314,7 +4539,7 @@ AC_DEFUN([GLIBCXX_CHECK_PTHREAD_MUTEX_CLOCKLOCK], [
       [glibcxx_cv_PTHREAD_MUTEX_CLOCKLOCK=no])
   ])
   if test $glibcxx_cv_PTHREAD_MUTEX_CLOCKLOCK = yes; then
-    AC_DEFINE(_GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK, 1, [Define if pthread_mutex_clocklock is available in <pthread.h>.])
+    AC_DEFINE(_GLIBCXX_USE_PTHREAD_MUTEX_CLOCKLOCK, (_GLIBCXX_TSAN==0), [Define if pthread_mutex_clocklock is available in <pthread.h>.])
   fi
 
   CXXFLAGS="$ac_save_CXXFLAGS"
@@ -5244,6 +5469,31 @@ AC_DEFUN([GLIBCXX_ZONEINFO_DIR], [
     AC_DEFINE_UNQUOTED(_GLIBCXX_STATIC_TZDATA, 1,
       [Define if static tzdata should be compiled into the library.])
   fi
+])
+
+dnl
+dnl Check whether lock tables can be aligned to avoid false sharing.
+dnl
+dnl Defines:
+dnl  _GLIBCXX_CAN_ALIGNAS_DESTRUCTIVE_SIZE if objects with static storage
+dnl    duration can be aligned to std::hardware_destructive_interference_size.
+dnl
+AC_DEFUN([GLIBCXX_CHECK_ALIGNAS_CACHELINE], [
+  AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+
+  AC_MSG_CHECKING([whether static objects can be aligned to the cacheline size])
+  AC_TRY_COMPILE(, [struct alignas(__GCC_DESTRUCTIVE_SIZE) Aligned { };
+		    alignas(Aligned) static char buf[sizeof(Aligned) * 16];
+		 ], [ac_alignas_cacheline=yes], [ac_alignas_cacheline=no])
+  if test "$ac_alignas_cacheline" = yes; then
+    AC_DEFINE_UNQUOTED(_GLIBCXX_CAN_ALIGNAS_DESTRUCTIVE_SIZE, 1,
+      [Define if global objects can be aligned to
+       std::hardware_destructive_interference_size.])
+  fi
+  AC_MSG_RESULT($ac_alignas_cacheline)
+
+  AC_LANG_RESTORE
 ])
 
 # Macros from the top-level gcc directory.

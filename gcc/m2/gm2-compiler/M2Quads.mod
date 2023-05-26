@@ -248,8 +248,6 @@ FROM M2Range IMPORT InitAssignmentRangeCheck,
                     InitWholeZeroDivisionCheck,
                     InitWholeZeroRemainderCheck,
                     InitParameterRangeCheck,
-                    (* CheckRangeAddVariableRead,  *)
-                    (* CheckRangeRemoveVariableRead,  *)
                     WriteRangeCheck ;
 
 FROM M2CaseList IMPORT PushCase, PopCase, AddRange, BeginCaseList, EndCaseList, ElseCase ;
@@ -262,7 +260,7 @@ IMPORT M2Error ;
 CONST
    DebugStackOn = TRUE ;
    DebugVarients = FALSE ;
-   BreakAtQuad = 4423 ;
+   BreakAtQuad = 133 ;
    DebugTokPos = FALSE ;
 
 TYPE
@@ -289,30 +287,31 @@ TYPE
                              Operand1           : CARDINAL ;
                              Operand2           : CARDINAL ;
                              Operand3           : CARDINAL ;
-                             Next               : CARDINAL ;     (* Next quadruple                 *)
-                             LineNo             : CARDINAL ;     (* Line No of source text         *)
-                             TokenNo            : CARDINAL ;     (* Token No of source text        *)
-                             NoOfTimesReferenced: CARDINAL ;     (* No of times quad is referenced *)
-                             CheckOverflow      : BOOLEAN ;      (* should backend check overflow  *)
+                             Next               : CARDINAL ;     (* Next quadruple.                 *)
+                             LineNo             : CARDINAL ;     (* Line No of source text.         *)
+                             TokenNo            : CARDINAL ;     (* Token No of source text.        *)
+                             NoOfTimesReferenced: CARDINAL ;     (* No of times quad is referenced. *)
+                             CheckOverflow      : BOOLEAN ;      (* should backend check overflow   *)
                              op1pos,
                              op2pos,
-                             op3pos             : CARDINAL ;     (* token position of operands.    *)
+                             op3pos             : CARDINAL ;     (* Token position of operands.     *)
                           END ;
 
    WithFrame = POINTER TO RECORD
                              RecordSym   : CARDINAL ;
                              RecordType  : CARDINAL ;
                              RecordRef   : CARDINAL ;
-                             rw          : CARDINAL ;  (* The record variable.  *)
-                             RecordTokPos: CARDINAL ;  (* Token of the record.  *)
+                             rw          : CARDINAL ;          (* The record variable.  *)
+                             RecordTokPos: CARDINAL ;          (* Token of the record.  *)
                           END ;
 
    ForLoopInfo = POINTER TO RECORD
                                IncrementQuad,
-                               StartOfForLoop,                 (* we keep a list of all for      *)
-                               EndOfForLoop,                   (* loops so we can check index    *)
+                               StartOfForLoop,                 (* We keep a list of all for         *)
+                               EndOfForLoop,                   (* loops so we can check index.      *)
                                ForLoopIndex,
-                               IndexTok      : CARDINAL ;      (* variables are not abused       *)
+                               IndexTok      : CARDINAL ;      (* Used to ensure iterators are not  *)
+                                                               (* user modified.                    *)
                             END ;
 
    LineNote  = POINTER TO RECORD
@@ -334,37 +333,40 @@ VAR
    WhileStack,
    ForStack,
    ExitStack,
-   ReturnStack          : StackOfWord ;   (* Return quadruple of the procedure.      *)
-   PriorityStack        : StackOfWord ;   (* temporary variable holding old priority *)
+   ReturnStack          : StackOfWord ;   (* Return quadruple of the procedure.  *)
+   PriorityStack        : StackOfWord ;   (* Temporary variable holding old      *)
+                                          (* priority.                           *)
    SuppressWith         : BOOLEAN ;
    QuadArray            : Index ;
    NextQuad             : CARDINAL ;  (* Next quadruple number to be created.    *)
    FreeList             : CARDINAL ;  (* FreeList of quadruples.                 *)
    CurrentProc          : CARDINAL ;  (* Current procedure being compiled, used  *)
-                                      (* to determine which procedure a RETURN   *)
+                                      (* to determine which procedure a RETURN.  *)
                                       (* ReturnValueOp must have as its 3rd op.  *)
    InitQuad             : CARDINAL ;  (* Initial Quad BackPatch that starts the  *)
                                       (* suit of Modules.                        *)
    LastQuadNo           : CARDINAL ;  (* Last Quadruple accessed by GetQuad.     *)
+   ArithPlusTok,                      (* Internal + token for arithmetic only.   *)
    LogicalOrTok,                      (* Internal _LOR token.                    *)
    LogicalAndTok,                     (* Internal _LAND token.                   *)
    LogicalXorTok,                     (* Internal _LXOR token.                   *)
    LogicalDifferenceTok : Name ;      (* Internal _LDIFF token.                  *)
    InConstExpression,
-   IsAutoOn,                          (* should parser automatically push idents *)
+   IsAutoOn,                          (* Should parser automatically push        *)
+                                      (* idents?                                 *)
    MustNotCheckBounds   : BOOLEAN ;
-   ForInfo              : Index ;     (* start and end of all FOR loops       *)
-   GrowInitialization   : CARDINAL ;  (* upper limit of where the initialized    *)
+   ForInfo              : Index ;     (* Start and end of all FOR loops.         *)
+   GrowInitialization   : CARDINAL ;  (* Upper limit of where the initialized    *)
                                       (* quadruples.                             *)
    BuildingHigh,
    BuildingSize,
-   QuadrupleGeneration  : BOOLEAN ;      (* should we be generating quadruples?  *)
-   FreeLineList         : LineNote ;  (* free list of line notes                 *)
-   VarientFields        : List ;      (* the list of all varient fields created  *)
-   VarientFieldNo       : CARDINAL ;  (* used to retrieve the VarientFields      *)
+   QuadrupleGeneration  : BOOLEAN ;      (* Should we be generating quadruples?  *)
+   FreeLineList         : LineNote ;  (* Free list of line notes.                *)
+   VarientFields        : List ;      (* The list of all varient fields created. *)
+   VarientFieldNo       : CARDINAL ;  (* Used to retrieve the VarientFields      *)
                                       (* in order.                               *)
    NoOfQuads            : CARDINAL ;  (* Number of used quadruples.              *)
-   Head                 : CARDINAL ;  (* Head of the list of quadruples *)
+   Head                 : CARDINAL ;  (* Head of the list of quadruples.         *)
 
 
 (*
@@ -3194,7 +3196,7 @@ BEGIN
    IF IsConstString(Exp) AND IsConst(Des)
    THEN
       GenQuadOtok (tokno, BecomesOp, Des, NulSym, Exp, TRUE,
-                   tokno, destok, exptok) ;
+                   destok, UnknownTokenNo, exptok) ;
       PutConstString (tokno, Des, GetString (Exp))
    ELSE
       IF GetMode(Des)=RightValue
@@ -3205,7 +3207,7 @@ BEGIN
             doIndrX (tokno, Des, Exp)
          ELSE
             GenQuadOtok (tokno, BecomesOp, Des, NulSym, Exp, TRUE,
-                         tokno, destok, exptok)
+                         destok, UnknownTokenNo, exptok)
          END
       ELSIF GetMode(Des)=LeftValue
       THEN
@@ -3226,7 +3228,7 @@ BEGIN
          END
       ELSE
          GenQuadOtok (tokno, BecomesOp, Des, NulSym, Exp, TRUE,
-                      tokno, destok, exptok)
+                      destok, UnknownTokenNo, exptok)
       END
    END
 END MoveWithMode ;
@@ -3541,6 +3543,17 @@ BEGIN
       MarkAsWrite (w) ;
       CheckCompatibleWithBecomes (Des, Exp, destok, exptok) ;
       combinedtok := MakeVirtualTok (becomesTokNo, destok, exptok) ;
+      IF DebugTokPos
+      THEN
+         MetaErrorT1 (becomesTokNo, 'becomestok {%1Oad}', Des) ;
+         MetaErrorT1 (destok, 'destok {%1Oad}', Des) ;
+         MetaErrorT1 (exptok, 'exptok {%1Oad}', Exp)
+      END ;
+      combinedtok := MakeVirtualTok (becomesTokNo, destok, exptok) ;
+      IF DebugTokPos
+      THEN
+         MetaErrorT1 (combinedtok, 'combined {%1Oad}', Des)
+      END ;
       IF (GetSType (Des) # NulSym) AND (NOT IsSet (GetDType (Des)))
       THEN
          (* Tell code generator to test runtime values of assignment so ensure we
@@ -3551,7 +3564,7 @@ BEGIN
       THEN
          CheckBecomesMeta (Des, Exp, combinedtok, destok, exptok)
       END ;
-      (* Traditional Assignment.  *)
+      (* Simple assignment.  *)
       MoveWithMode (becomesTokNo, Des, Exp, Array, destok, exptok, checkOverflow) ;
       IF checkTypes
       THEN
@@ -4436,7 +4449,7 @@ BEGIN
    PushT (TimesTok) ;
    PushTFtok (BySym, ByType, bytok) ;
    doBuildBinaryOp (FALSE, FALSE) ;
-   PushT (PlusTok) ;
+   PushT (ArithPlusTok) ;
    PushTFtok (e1, GetSType (e1), e1tok) ;
    doBuildBinaryOp (FALSE, FALSE) ;
    BuildForLoopToRangeCheck ;
@@ -10924,7 +10937,7 @@ END CheckReturnType ;
 
 (*
    BuildReturn - Builds the Return part of the procedure.
-                 tokno is the location of the RETURN keyword.
+                 tokreturn is the location of the RETURN keyword.
                  The Stack is expected to contain:
 
 
@@ -10937,48 +10950,53 @@ END CheckReturnType ;
                  |------------|
 *)
 
-PROCEDURE BuildReturn (tokno: CARDINAL) ;
+PROCEDURE BuildReturn (tokreturn: CARDINAL) ;
 VAR
+   tokcombined,
+   tokexpr    : CARDINAL ;
    e2, t2,
    e1, t1,
    t, f,
-   Des   : CARDINAL ;
+   Des        : CARDINAL ;
 BEGIN
    IF IsBoolean (1)
    THEN
-      PopBool(t, f) ;
+      PopBooltok (t, f, tokexpr) ;
       (* Des will be a boolean type *)
-      Des := MakeTemporary (tokno, RightValue) ;
+      Des := MakeTemporary (tokexpr, RightValue) ;
       PutVar (Des, Boolean) ;
-      PushTF (Des, Boolean) ;
-      PushBool (t, f) ;
-      BuildAssignmentWithoutBounds (tokno, FALSE, TRUE) ;
-      PushTF (Des, Boolean)
+      PushTFtok (Des, Boolean, tokexpr) ;
+      PushBooltok (t, f, tokexpr) ;
+      BuildAssignmentWithoutBounds (tokreturn, FALSE, TRUE) ;
+      PushTFtok (Des, Boolean, tokexpr)
    END ;
-   PopTF (e1, t1) ;
+   PopTFtok (e1, t1, tokexpr) ;
+   tokcombined := MakeVirtualTok (tokreturn, tokreturn, tokexpr) ;
    IF e1 # NulSym
    THEN
       (* this will check that the type returned is compatible with
          the formal return type of the procedure.  *)
-      CheckReturnType (tokno, CurrentProc, e1, t1) ;
+      CheckReturnType (tokcombined, CurrentProc, e1, t1) ;
       (* dereference LeftValue if necessary *)
       IF GetMode (e1) = LeftValue
       THEN
          t2 := GetSType (CurrentProc) ;
-         e2 := MakeTemporary (tokno, RightValue) ;
+         e2 := MakeTemporary (tokexpr, RightValue) ;
          PutVar(e2, t2) ;
-         CheckPointerThroughNil (tokno, e1) ;
-         doIndrX (tokno, e2, e1) ;
+         CheckPointerThroughNil (tokexpr, e1) ;
+         doIndrX (tokexpr, e2, e1) ;
 	 (* here we check the data contents to ensure no overflow.  *)
-         BuildRange (InitReturnRangeCheck (tokno, CurrentProc, e2)) ;
-         GenQuadO (tokno, ReturnValueOp, e2, NulSym, CurrentProc, FALSE)
+         BuildRange (InitReturnRangeCheck (tokcombined, CurrentProc, e2)) ;
+         GenQuadOtok (tokcombined, ReturnValueOp, e2, NulSym, CurrentProc, FALSE,
+                      tokcombined, UnknownTokenNo, GetDeclaredMod (CurrentProc))
       ELSE
 	 (* here we check the data contents to ensure no overflow.  *)
-         BuildRange (InitReturnRangeCheck (tokno, CurrentProc, e1)) ;
-         GenQuadO (tokno, ReturnValueOp, e1, NulSym, CurrentProc, FALSE)
+         BuildRange (InitReturnRangeCheck (tokcombined, CurrentProc, e1)) ;
+         GenQuadOtok (tokcombined, ReturnValueOp, e1, NulSym, CurrentProc, FALSE,
+                      tokcombined, UnknownTokenNo, GetDeclaredMod (CurrentProc))
       END
    END ;
-   GenQuadO (tokno, GotoOp, NulSym, NulSym, PopWord(ReturnStack), FALSE) ;
+   GenQuadO (tokcombined, GotoOp, NulSym, NulSym, PopWord (ReturnStack), FALSE) ;
    PushWord (ReturnStack, NextQuad-1)
 END BuildReturn ;
 
@@ -12906,7 +12924,7 @@ BEGIN
          left := t
       END ;
       combinedTok := MakeVirtualTok (optokpos, leftpos, rightpos) ;
-      GenQuadO (combinedTok, MakeOp(Op), left, right, 0, FALSE) ;  (* True  Exit *)
+      GenQuadO (combinedTok, MakeOp (Op), left, right, 0, FALSE) ;  (* True  Exit *)
       GenQuadO (combinedTok, GotoOp, NulSym, NulSym, 0, FALSE) ;  (* False Exit *)
       PushBool (NextQuad-2, NextQuad-1)
    END
@@ -12946,7 +12964,10 @@ END BuildNot ;
 
 PROCEDURE MakeOp (t: Name) : QuadOperator ;
 BEGIN
-   IF t=PlusTok
+   IF t=ArithPlusTok
+   THEN
+      RETURN ArithAddOp
+   ELSIF t=PlusTok
    THEN
       RETURN( AddOp )
    ELSIF t=MinusTok
@@ -13394,6 +13415,7 @@ BEGIN
       LogicalAndOp,
       LogicalXorOp,
       LogicalDiffOp,
+      ArithAddOp,
       CoerceOp,
       ConvertOp,
       CastOp,
@@ -13454,6 +13476,7 @@ PROCEDURE WriteOperator (Operator: QuadOperator) ;
 BEGIN
    CASE Operator OF
 
+   ArithAddOp               : printf0('Arith +           ') |
    InitAddressOp            : printf0('InitAddress       ') |
    LogicalOrOp              : printf0('Or                ') |
    LogicalAndOp             : printf0('And               ') |
@@ -15120,6 +15143,7 @@ BEGIN
    LogicalAndTok := MakeKey('_LAND') ;
    LogicalXorTok := MakeKey('_LXOR') ;
    LogicalDifferenceTok := MakeKey('_LDIFF') ;
+   ArithPlusTok := MakeKey ('_ARITH_+') ;
    QuadArray := InitIndex (1) ;
    FreeList := 1 ;
    NewQuad(NextQuad) ;

@@ -98,7 +98,7 @@ create_canonical_iv (class loop *loop, edge exit, tree niter,
       fprintf (dump_file, " iterations.\n");
     }
 
-  cond = as_a <gcond *> (last_stmt (exit->src));
+  cond = as_a <gcond *> (*gsi_last_bb (exit->src));
   in = EDGE_SUCC (exit->src, 0);
   if (in == exit)
     in = EDGE_SUCC (exit->src, 1);
@@ -113,7 +113,7 @@ create_canonical_iv (class loop *loop, edge exit, tree niter,
 		       niter,
 		       build_int_cst (type, 1));
   incr_at = gsi_last_bb (in->src);
-  create_iv (niter,
+  create_iv (niter, PLUS_EXPR,
 	     build_int_cst (type, -1),
 	     NULL_TREE, loop,
 	     &incr_at, false, var_before, &var);
@@ -263,7 +263,7 @@ tree_estimate_loop_size (class loop *loop, edge exit, edge edge_to_cancel,
 	    {
 	      /* Exit conditional.  */
 	      if (exit && body[i] == exit->src
-		  && stmt == last_stmt (exit->src))
+		  && stmt == *gsi_last_bb (exit->src))
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    fprintf (dump_file, "   Exit condition will be eliminated "
@@ -271,7 +271,7 @@ tree_estimate_loop_size (class loop *loop, edge exit, edge edge_to_cancel,
 		  likely_eliminated_peeled = true;
 		}
 	      if (edge_to_cancel && body[i] == edge_to_cancel->src
-		  && stmt == last_stmt (edge_to_cancel->src))
+		  && stmt == *gsi_last_bb (edge_to_cancel->src))
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    fprintf (dump_file, "   Exit condition will be eliminated "
@@ -618,8 +618,10 @@ static bitmap peeled_loops;
    LOOP_CLOSED_SSA_INVALIDATED is used to bookkepp the case
    when we need to go into loop closed SSA form.  */
 
-static void
-unloop_loops (bitmap loop_closed_ssa_invalidated,
+void
+unloop_loops (vec<class loop *> &loops_to_unloop,
+	      vec<int> &loops_to_unloop_nunroll,
+	      bitmap loop_closed_ssa_invalidated,
 	      bool *irred_invalidated)
 {
   while (loops_to_unloop.length ())
@@ -653,8 +655,6 @@ unloop_loops (bitmap loop_closed_ssa_invalidated,
       gsi = gsi_start_bb (latch_edge->dest);
       gsi_insert_after (&gsi, stmt, GSI_NEW_STMT);
     }
-  loops_to_unloop.release ();
-  loops_to_unloop_nunroll.release ();
 
   /* Remove edges in peeled copies.  Given remove_path removes dominated
      regions we need to cope with removal of already removed paths.  */
@@ -923,7 +923,7 @@ try_unroll_loop_completely (class loop *loop,
   /* Remove the conditional from the last copy of the loop.  */
   if (edge_to_cancel)
     {
-      gcond *cond = as_a <gcond *> (last_stmt (edge_to_cancel->src));
+      gcond *cond = as_a <gcond *> (*gsi_last_bb (edge_to_cancel->src));
       force_edge_cold (edge_to_cancel, true);
       if (edge_to_cancel->flags & EDGE_TRUE_VALUE)
 	gimple_cond_make_false (cond);
@@ -1207,7 +1207,7 @@ canonicalize_loop_induction_variables (class loop *loop,
 	= niter_desc.may_be_zero && !integer_zerop (niter_desc.may_be_zero);
     }
   if (TREE_CODE (niter) == INTEGER_CST)
-    locus = last_stmt (exit->src);
+    locus = last_nondebug_stmt (exit->src);
   else
     {
       /* For non-constant niter fold may_be_zero into niter again.  */
@@ -1234,7 +1234,7 @@ canonicalize_loop_induction_variables (class loop *loop,
 	niter = find_loop_niter_by_eval (loop, &exit);
 
       if (exit)
-        locus = last_stmt (exit->src);
+	locus = last_nondebug_stmt (exit->src);
 
       if (TREE_CODE (niter) != INTEGER_CST)
 	exit = NULL;
@@ -1326,7 +1326,10 @@ canonicalize_induction_variables (void)
     }
   gcc_assert (!need_ssa_update_p (cfun));
 
-  unloop_loops (loop_closed_ssa_invalidated, &irred_invalidated);
+  unloop_loops (loops_to_unloop, loops_to_unloop_nunroll,
+		loop_closed_ssa_invalidated, &irred_invalidated);
+  loops_to_unloop.release ();
+  loops_to_unloop_nunroll.release ();
   if (irred_invalidated
       && loops_state_satisfies_p (LOOPS_HAVE_MARKED_IRREDUCIBLE_REGIONS))
     mark_irreducible_loops ();
@@ -1473,7 +1476,12 @@ tree_unroll_loops_completely (bool may_increase_size, bool unroll_outer)
 	{
 	  unsigned i;
 
-          unloop_loops (loop_closed_ssa_invalidated, &irred_invalidated);
+	  unloop_loops (loops_to_unloop,
+			loops_to_unloop_nunroll,
+			loop_closed_ssa_invalidated,
+			&irred_invalidated);
+	  loops_to_unloop.release ();
+	  loops_to_unloop_nunroll.release ();
 
 	  /* We cannot use TODO_update_ssa_no_phi because VOPS gets confused.  */
 	  if (loop_closed_ssa_invalidated

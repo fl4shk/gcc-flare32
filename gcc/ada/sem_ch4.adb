@@ -65,6 +65,7 @@ with Sinfo;          use Sinfo;
 with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
 with Snames;         use Snames;
+with Style;          use Style;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
 with Warnsw;         use Warnsw;
@@ -2368,6 +2369,16 @@ package body Sem_Ch4 is
       procedure Check_Action_OK (A : Node_Id) is
       begin
          if not Comes_From_Source (N) or else not Comes_From_Source (A) then
+
+            --  If, for example, an (illegal) expression function is
+            --  transformed into a "vanilla" function then we don't want to
+            --  allow it just because Comes_From_Source is now False. So look
+            --  at the Original_Node.
+
+            if Is_Rewrite_Substitution (A) then
+               Check_Action_OK (Original_Node (A));
+            end if;
+
             return; -- Allow anything in generated code
          end if;
 
@@ -2400,10 +2411,27 @@ package body Sem_Ch4 is
                   return; -- ???For now; the RM rule is a bit more complicated
                end if;
 
+            when N_Pragma =>
+               declare
+                  --  See AI22-0045 pragma categorization.
+                  subtype Executable_Pragma_Id is Pragma_Id
+                    with Predicate => Executable_Pragma_Id in
+                        --  language-defined executable pragmas
+                      Pragma_Assert | Pragma_Inspection_Point
+
+                        --  GNAT-defined executable pragmas
+                        | Pragma_Assume | Pragma_Debug;
+               begin
+                  if Get_Pragma_Id (A) in Executable_Pragma_Id then
+                     return;
+                  end if;
+               end;
+
             when others =>
-               null; -- Nothing else allowed, not even pragmas
+               null; -- Nothing else allowed
          end case;
 
+         --  We could mention pragmas in the message text; let's not.
          Error_Msg_N ("object renaming or constant declaration expected", A);
       end Check_Action_OK;
 
@@ -3124,6 +3152,20 @@ package body Sem_Ch4 is
 
       Operator_Check (N);
       Check_Function_Writable_Actuals (N);
+
+      if Style_Check then
+         if Nkind (L) not in N_Short_Circuit | N_Op_And | N_Op_Or | N_Op_Xor
+           and then Is_Boolean_Type (Etype (L))
+         then
+            Check_Xtra_Parens_Precedence (L);
+         end if;
+
+         if Nkind (R) not in N_Short_Circuit | N_Op_And | N_Op_Or | N_Op_Xor
+           and then Is_Boolean_Type (Etype (R))
+         then
+            Check_Xtra_Parens_Precedence (R);
+         end if;
+      end if;
    end Analyze_Logical_Op;
 
    ---------------------------
@@ -4873,10 +4915,9 @@ package body Sem_Ch4 is
       function Constraint_Has_Unprefixed_Discriminant_Reference
         (Typ : Entity_Id) return Boolean
       is
-
          function Is_Discriminant_Name (N : Node_Id) return Boolean is
-           ((Nkind (N) = N_Identifier)
-              and then (Ekind (Entity (N)) = E_Discriminant));
+           (Nkind (N) = N_Identifier
+              and then Ekind (Entity (N)) = E_Discriminant);
       begin
          if Is_Array_Type (Typ) then
             declare
@@ -5996,6 +6037,18 @@ package body Sem_Ch4 is
          Resolve (L, Standard_Boolean);
          Resolve (R, Standard_Boolean);
          Set_Etype (N, Standard_Boolean);
+      end if;
+
+      if Style_Check then
+         if Nkind (L) not in N_Short_Circuit | N_Op_And | N_Op_Or | N_Op_Xor
+         then
+            Check_Xtra_Parens_Precedence (L);
+         end if;
+
+         if Nkind (R) not in N_Short_Circuit | N_Op_And | N_Op_Or | N_Op_Xor
+         then
+            Check_Xtra_Parens_Precedence (R);
+         end if;
       end if;
    end Analyze_Short_Circuit;
 

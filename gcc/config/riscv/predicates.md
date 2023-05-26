@@ -235,13 +235,15 @@
   (and (match_code "const_int")
        (match_test "SINGLE_BIT_MASK_OPERAND (~UINTVAL (op))")))
 
-(define_predicate "const31_operand"
+(define_predicate "const_si_mask_operand"
   (and (match_code "const_int")
-       (match_test "INTVAL (op) == 31")))
+       (match_test "(INTVAL (op) & (GET_MODE_BITSIZE (SImode) - 1))
+                    == GET_MODE_BITSIZE (SImode) - 1")))
 
-(define_predicate "const63_operand"
+(define_predicate "const_di_mask_operand"
   (and (match_code "const_int")
-       (match_test "INTVAL (op) == 63")))
+       (match_test "(INTVAL (op) & (GET_MODE_BITSIZE (DImode) - 1))
+                    == GET_MODE_BITSIZE (DImode) - 1")))
 
 (define_predicate "imm5_operand"
   (and (match_code "const_int")
@@ -366,6 +368,11 @@
   (and (match_code "const_int")
        (match_test "popcount_hwi (~UINTVAL (op)) == 2")))
 
+(define_predicate "const_nottwobits_not_arith_operand"
+  (and (match_code "const_int")
+       (and (not (match_operand 0 "arith_operand"))
+	    (match_operand 0 "const_nottwobits_operand"))))
+
 ;; A CONST_INT operand that consists of a single run of 32 consecutive
 ;; set bits.
 (define_predicate "consecutive_bits32_operand"
@@ -411,4 +418,4 @@
 (define_predicate "not_uimm_extra_bit_or_nottwobits"
   (and (match_code "const_int")
        (ior (match_operand 0 "not_uimm_extra_bit_operand")
-	    (match_operand 0 "const_nottwobits_operand"))))
+	    (match_operand 0 "const_nottwobits_not_arith_operand"))))

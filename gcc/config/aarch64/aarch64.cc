@@ -7464,19 +7464,24 @@ aarch64_vfp_is_call_candidate (cumulative_args_t pcum_v, machine_mode mode,
 /* Given MODE and TYPE of a function argument, return the alignment in
    bits.  The idea is to suppress any stronger alignment requested by
    the user and opt for the natural alignment (specified in AAPCS64 \S
-   4.1).  ABI_BREAK is set to the old alignment if the alignment was
-   incorrectly calculated in versions of GCC prior to GCC-9.
-   ABI_BREAK_PACKED is set to the old alignment if it was incorrectly
-   calculated in versions between GCC-9 and GCC-13.  This is a helper
-   function for local use only.  */
+   4.1).  ABI_BREAK_GCC_9 is set to the old alignment if the alignment
+   was incorrectly calculated in versions of GCC prior to GCC 9.
+   ABI_BREAK_GCC_13 is set to the old alignment if it was incorrectly
+   calculated in versions between GCC 9 and GCC 13.  If the alignment
+   might have changed between GCC 13 and GCC 14, ABI_BREAK_GCC_14
+   is the old GCC 13 alignment, otherwise it is zero.
+
+   This is a helper function for local use only.  */
 
 static unsigned int
 aarch64_function_arg_alignment (machine_mode mode, const_tree type,
-				unsigned int *abi_break,
-				unsigned int *abi_break_packed)
+				unsigned int *abi_break_gcc_9,
+				unsigned int *abi_break_gcc_13,
+				unsigned int *abi_break_gcc_14)
 {
-  *abi_break = 0;
-  *abi_break_packed = 0;
+  *abi_break_gcc_9 = 0;
+  *abi_break_gcc_13 = 0;
+  *abi_break_gcc_14 = 0;
   if (!type)
     return GET_MODE_ALIGNMENT (mode);
 
@@ -7496,6 +7501,11 @@ aarch64_function_arg_alignment (machine_mode mode, const_tree type,
 	{
 	  gcc_assert (known_eq (POINTER_SIZE, GET_MODE_BITSIZE (mode)));
 	  return POINTER_SIZE;
+	}
+      if (TREE_CODE (type) == ENUMERAL_TYPE && TREE_TYPE (type))
+	{
+	  *abi_break_gcc_14 = TYPE_ALIGN (type);
+	  type = TYPE_MAIN_VARIANT (TREE_TYPE (type));
 	}
       gcc_assert (!TYPE_USER_ALIGN (type));
       return TYPE_ALIGN (type);
@@ -7547,11 +7557,11 @@ aarch64_function_arg_alignment (machine_mode mode, const_tree type,
      'packed' attribute into account.  */
   if (bitfield_alignment != bitfield_alignment_with_packed
       && bitfield_alignment_with_packed > alignment)
-    *abi_break_packed = bitfield_alignment_with_packed;
+    *abi_break_gcc_13 = bitfield_alignment_with_packed;
 
   if (bitfield_alignment > alignment)
     {
-      *abi_break = alignment;
+      *abi_break_gcc_9 = alignment;
       return bitfield_alignment;
     }
 
@@ -7573,8 +7583,9 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
   int ncrn, nvrn, nregs;
   bool allocate_ncrn, allocate_nvrn;
   HOST_WIDE_INT size;
-  unsigned int abi_break;
-  unsigned int abi_break_packed;
+  unsigned int abi_break_gcc_9;
+  unsigned int abi_break_gcc_13;
+  unsigned int abi_break_gcc_14;
 
   /* We need to do this once per argument.  */
   if (pcum->aapcs_arg_processed)
@@ -7612,7 +7623,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 
      Versions prior to GCC 9.1 ignored a bitfield's underlying type
      and so could calculate an alignment that was too small.  If this
-     happened for TYPE then ABI_BREAK is this older, too-small alignment.
+     happened for TYPE then ABI_BREAK_GCC_9 is this older, too-small alignment.
 
      Although GCC 9.1 fixed that bug, it introduced a different one:
      it would consider the alignment of a bitfield's underlying type even
@@ -7620,7 +7631,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
      the alignment of the underlying type).  This was fixed in GCC 13.1.
 
      As a result of this bug, GCC 9 to GCC 12 could calculate an alignment
-     that was too big.  If this happened for TYPE, ABI_BREAK_PACKED is
+     that was too big.  If this happened for TYPE, ABI_BREAK_GCC_13 is
      this older, too-big alignment.
 
      Also, the fact that GCC 9 to GCC 12 considered irrelevant
@@ -7713,12 +7724,12 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
   gcc_assert (!sve_p || !allocate_nvrn);
 
   unsigned int alignment
-    = aarch64_function_arg_alignment (mode, type, &abi_break,
-				      &abi_break_packed);
+    = aarch64_function_arg_alignment (mode, type, &abi_break_gcc_9,
+				      &abi_break_gcc_13, &abi_break_gcc_14);
 
   gcc_assert ((allocate_nvrn || alignment <= 16 * BITS_PER_UNIT)
-	      && (!alignment || abi_break < alignment)
-	      && (!abi_break_packed || alignment < abi_break_packed));
+	      && (!alignment || abi_break_gcc_9 < alignment)
+	      && (!abi_break_gcc_13 || alignment < abi_break_gcc_13));
 
   /* allocate_ncrn may be false-positive, but allocate_nvrn is quite reliable.
      The following code thus handles passing by SIMD/FP registers first.  */
@@ -7792,11 +7803,18 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	  /* Emit a warning if the alignment changed when taking the
 	     'packed' attribute into account.  */
 	  if (warn_pcs_change
-	      && abi_break_packed
-	      && ((abi_break_packed == 16 * BITS_PER_UNIT)
+	      && abi_break_gcc_13
+	      && ((abi_break_gcc_13 == 16 * BITS_PER_UNIT)
 		  != (alignment == 16 * BITS_PER_UNIT)))
 	    inform (input_location, "parameter passing for argument of type "
 		    "%qT changed in GCC 13.1", type);
+
+	  if (warn_pcs_change
+	      && abi_break_gcc_14
+	      && ((abi_break_gcc_14 == 16 * BITS_PER_UNIT)
+		  != (alignment == 16 * BITS_PER_UNIT)))
+	    inform (input_location, "parameter passing for argument of type "
+		    "%qT changed in GCC 14.1", type);
 
 	  /* The == 16 * BITS_PER_UNIT instead of >= 16 * BITS_PER_UNIT
 	     comparison is there because for > 16 * BITS_PER_UNIT
@@ -7804,7 +7822,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 	     passed by reference rather than value.  */
 	  if (alignment == 16 * BITS_PER_UNIT)
 	    {
-	      if (warn_pcs_change && abi_break)
+	      if (warn_pcs_change && abi_break_gcc_9)
 		inform (input_location, "parameter passing for argument of type "
 			"%qT changed in GCC 9.1", type);
 	      ++ncrn;
@@ -7863,18 +7881,25 @@ on_stack:
   pcum->aapcs_stack_words = size / UNITS_PER_WORD;
 
   if (warn_pcs_change
-      && abi_break_packed
-      && ((abi_break_packed >= 16 * BITS_PER_UNIT)
+      && abi_break_gcc_13
+      && ((abi_break_gcc_13 >= 16 * BITS_PER_UNIT)
 	  != (alignment >= 16 * BITS_PER_UNIT)))
     inform (input_location, "parameter passing for argument of type "
 	    "%qT changed in GCC 13.1", type);
+
+  if (warn_pcs_change
+      && abi_break_gcc_14
+      && ((abi_break_gcc_14 >= 16 * BITS_PER_UNIT)
+	  != (alignment >= 16 * BITS_PER_UNIT)))
+    inform (input_location, "parameter passing for argument of type "
+	    "%qT changed in GCC 14.1", type);
 
   if (alignment == 16 * BITS_PER_UNIT)
     {
       int new_size = ROUND_UP (pcum->aapcs_stack_size, 16 / UNITS_PER_WORD);
       if (pcum->aapcs_stack_size != new_size)
 	{
-	  if (warn_pcs_change && abi_break)
+	  if (warn_pcs_change && abi_break_gcc_9)
 	    inform (input_location, "parameter passing for argument of type "
 		    "%qT changed in GCC 9.1", type);
 	  pcum->aapcs_stack_size = new_size;
@@ -7991,11 +8016,13 @@ aarch64_function_arg_regno_p (unsigned regno)
 static unsigned int
 aarch64_function_arg_boundary (machine_mode mode, const_tree type)
 {
-  unsigned int abi_break;
-  unsigned int abi_break_packed;
+  unsigned int abi_break_gcc_9;
+  unsigned int abi_break_gcc_13;
+  unsigned int abi_break_gcc_14;
   unsigned int alignment = aarch64_function_arg_alignment (mode, type,
-							   &abi_break,
-							   &abi_break_packed);
+							   &abi_break_gcc_9,
+							   &abi_break_gcc_13,
+							   &abi_break_gcc_14);
   /* We rely on aarch64_layout_arg and aarch64_gimplify_va_arg_expr
      to emit warnings about ABI incompatibility.  */
   alignment = MIN (MAX (alignment, PARM_BOUNDARY), STACK_BOUNDARY);
@@ -13822,6 +13849,31 @@ aarch64_masks_and_shift_for_bfi_p (scalar_int_mode mode,
   return (t == (t & -t));
 }
 
+/* Return true if X is an RTX representing an operation in the ABD family
+   of instructions.  */
+
+static bool
+aarch64_abd_rtx_p (rtx x)
+{
+  if (GET_CODE (x) != MINUS)
+    return false;
+  rtx max_arm = XEXP (x, 0);
+  rtx min_arm = XEXP (x, 1);
+  if (GET_CODE (max_arm) != SMAX && GET_CODE (max_arm) != UMAX)
+    return false;
+  bool signed_p = GET_CODE (max_arm) == SMAX;
+  if (signed_p && GET_CODE (min_arm) != SMIN)
+    return false;
+  else if (!signed_p && GET_CODE (min_arm) != UMIN)
+    return false;
+
+  rtx maxop0 = XEXP (max_arm, 0);
+  rtx maxop1 = XEXP (max_arm, 1);
+  rtx minop0 = XEXP (min_arm, 0);
+  rtx minop1 = XEXP (min_arm, 1);
+  return rtx_equal_p (maxop0, minop0) && rtx_equal_p (maxop1, minop1);
+}
+
 /* Calculate the cost of calculating X, storing it in *COST.  Result
    is true if the total cost of the operation has now been calculated.  */
 static bool
@@ -14029,6 +14081,27 @@ aarch64_rtx_costs (rtx x, machine_mode mode, int outer ATTRIBUTE_UNUSED,
 
       if (VECTOR_MODE_P (mode))
 	{
+	  /* Many vector comparison operations are represented as NEG
+	     of a comparison.  */
+	  if (COMPARISON_P (op0))
+	    {
+	      rtx op00 = XEXP (op0, 0);
+	      rtx op01 = XEXP (op0, 1);
+	      machine_mode inner_mode = GET_MODE (op00);
+	      /* FACGE/FACGT.  */
+	      if (GET_MODE_CLASS (inner_mode) == MODE_VECTOR_FLOAT
+		  && GET_CODE (op00) == ABS
+		  && GET_CODE (op01) == ABS)
+		{
+		  op00 = XEXP (op00, 0);
+		  op01 = XEXP (op01, 0);
+		}
+	      *cost += rtx_cost (op00, inner_mode, GET_CODE (op0), 0, speed);
+	      *cost += rtx_cost (op01, inner_mode, GET_CODE (op0), 1, speed);
+	      if (speed)
+		*cost += extra_cost->vect.alu;
+	      return true;
+	    }
 	  if (speed)
 	    {
 	      /* FNEG.  */
@@ -14218,11 +14291,20 @@ aarch64_rtx_costs (rtx x, machine_mode mode, int outer ATTRIBUTE_UNUSED,
 cost_minus:
 	if (VECTOR_MODE_P (mode))
 	  {
-	    /* SUBL2 and SUBW2.  */
 	    unsigned int vec_flags = aarch64_classify_vector_mode (mode);
 	    if (TARGET_SIMD && (vec_flags & VEC_ADVSIMD))
 	      {
-		/* The select-operand-high-half versions of the sub instruction
+		/* Recognise the SABD and UABD operation here.
+		   Recursion from the PLUS case will catch the accumulating
+		   forms.  */
+		if (aarch64_abd_rtx_p (x))
+		  {
+		    if (speed)
+		      *cost += extra_cost->vect.alu;
+		    return true;
+		  }
+		  /* SUBL2 and SUBW2.
+		   The select-operand-high-half versions of the sub instruction
 		   have the same cost as the regular three vector version -
 		   don't add the costs of the select into the costs of the sub.
 		   */
@@ -19728,10 +19810,12 @@ aarch64_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 		  f_stack, NULL_TREE);
   size = int_size_in_bytes (type);
 
-  unsigned int abi_break;
-  unsigned int abi_break_packed;
+  unsigned int abi_break_gcc_9;
+  unsigned int abi_break_gcc_13;
+  unsigned int abi_break_gcc_14;
   align
-    = aarch64_function_arg_alignment (mode, type, &abi_break, &abi_break_packed)
+    = aarch64_function_arg_alignment (mode, type, &abi_break_gcc_9,
+				      &abi_break_gcc_13, &abi_break_gcc_14)
     / BITS_PER_UNIT;
 
   dw_align = false;
@@ -19775,13 +19859,19 @@ aarch64_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
       rsize = ROUND_UP (size, UNITS_PER_WORD);
       nregs = rsize / UNITS_PER_WORD;
 
-      if (align <= 8 && abi_break_packed && warn_psabi)
+      if (align <= 8 && abi_break_gcc_13 && warn_psabi)
 	inform (input_location, "parameter passing for argument of type "
 		"%qT changed in GCC 13.1", type);
 
+      if (warn_psabi
+	  && abi_break_gcc_14
+	  && (abi_break_gcc_14 > 8 * BITS_PER_UNIT) != (align > 8))
+	inform (input_location, "parameter passing for argument of type "
+		"%qT changed in GCC 14.1", type);
+
       if (align > 8)
 	{
-	  if (abi_break && warn_psabi)
+	  if (abi_break_gcc_9 && warn_psabi)
 	    inform (input_location, "parameter passing for argument of type "
 		    "%qT changed in GCC 9.1", type);
 	  dw_align = true;
@@ -20384,7 +20474,7 @@ aarch64_short_vector_p (const_tree type,
 {
   poly_int64 size = -1;
 
-  if (type && TREE_CODE (type) == VECTOR_TYPE)
+  if (type && VECTOR_TYPE_P (type))
     {
       if (aarch64_sve::builtin_type_p (type))
 	return false;
@@ -20824,7 +20914,7 @@ aarch64_mangle_type (const_tree type)
     return "St9__va_list";
 
   /* Half-precision floating point types.  */
-  if (TREE_CODE (type) == REAL_TYPE && TYPE_PRECISION (type) == 16)
+  if (SCALAR_FLOAT_TYPE_P (type) && TYPE_PRECISION (type) == 16)
     {
       if (TYPE_MAIN_VARIANT (type) == float16_type_node)
 	return NULL;
@@ -22026,11 +22116,12 @@ aarch64_simd_make_constant (rtx vals)
     return NULL_RTX;
 }
 
-/* Expand a vector initialisation sequence, such that TARGET is
-   initialised to contain VALS.  */
+/* A subroutine of aarch64_expand_vector_init, with the same interface.
+   The caller has already tried a divide-and-conquer approach, so do
+   not consider that case here.  */
 
 void
-aarch64_expand_vector_init (rtx target, rtx vals)
+aarch64_expand_vector_init_fallback (rtx target, rtx vals)
 {
   machine_mode mode = GET_MODE (target);
   scalar_mode inner_mode = GET_MODE_INNER (mode);
@@ -22088,38 +22179,6 @@ aarch64_expand_vector_init (rtx target, rtx vals)
       rtx x = force_reg (inner_mode, v0);
       aarch64_emit_move (target, gen_vec_duplicate (mode, x));
       return;
-    }
-
-  /* Check for interleaving case.
-     For eg if initializer is (int16x8_t) {x, y, x, y, x, y, x, y}.
-     Generate following code:
-     dup v0.h, x
-     dup v1.h, y
-     zip1 v0.h, v0.h, v1.h
-     for "large enough" initializer.  */
-
-  if (n_elts >= 8)
-    {
-      int i;
-      for (i = 2; i < n_elts; i++)
-	if (!rtx_equal_p (XVECEXP (vals, 0, i), XVECEXP (vals, 0, i % 2)))
-	  break;
-
-      if (i == n_elts)
-	{
-	  machine_mode mode = GET_MODE (target);
-	  rtx dest[2];
-
-	  for (int i = 0; i < 2; i++)
-	    {
-	      rtx x = expand_vector_broadcast (mode, XVECEXP (vals, 0, i));
-	      dest[i] = force_reg (mode, x);
-	    }
-
-	  rtvec v = gen_rtvec (2, dest[0], dest[1]);
-	  emit_set_insn (target, gen_rtx_UNSPEC (mode, v, UNSPEC_ZIP1));
-	  return;
-	}
     }
 
   enum insn_code icode = optab_handler (vec_set_optab, mode);
@@ -22243,7 +22302,7 @@ aarch64_expand_vector_init (rtx target, rtx vals)
 	    }
 	  XVECEXP (copy, 0, i) = subst;
 	}
-      aarch64_expand_vector_init (target, copy);
+      aarch64_expand_vector_init_fallback (target, copy);
     }
 
   /* Insert the variable lanes directly.  */
@@ -22255,6 +22314,120 @@ aarch64_expand_vector_init (rtx target, rtx vals)
       x = force_reg (inner_mode, x);
       emit_insn (GEN_FCN (icode) (target, x, GEN_INT (i)));
     }
+}
+
+/* Return even or odd half of VALS depending on EVEN_P.  */
+
+static rtx
+aarch64_unzip_vector_init (machine_mode mode, rtx vals, bool even_p)
+{
+  int n = XVECLEN (vals, 0);
+  machine_mode new_mode
+    = aarch64_simd_container_mode (GET_MODE_INNER (mode),
+				   GET_MODE_BITSIZE (mode).to_constant () / 2);
+  rtvec vec = rtvec_alloc (n / 2);
+  for (int i = 0; i < n / 2; i++)
+    RTVEC_ELT (vec, i) = (even_p) ? XVECEXP (vals, 0, 2 * i)
+				  : XVECEXP (vals, 0, 2 * i + 1);
+  return gen_rtx_PARALLEL (new_mode, vec);
+}
+
+/* Return true if SET is a scalar move.  */
+
+static bool
+scalar_move_insn_p (rtx set)
+{
+  rtx src = SET_SRC (set);
+  rtx dest = SET_DEST (set);
+  return (is_a<scalar_mode> (GET_MODE (dest))
+	  && aarch64_mov_operand (src, GET_MODE (dest)));
+}
+
+/* Similar to seq_cost, but ignore cost for scalar moves.  */
+
+static unsigned
+seq_cost_ignoring_scalar_moves (const rtx_insn *seq, bool speed)
+{
+  unsigned cost = 0;
+
+  for (; seq; seq = NEXT_INSN (seq))
+    if (NONDEBUG_INSN_P (seq))
+      {
+	if (rtx set = single_set (seq))
+	  {
+	    if (!scalar_move_insn_p (set))
+	      cost += set_rtx_cost (set, speed);
+	  }
+	else
+	  {
+	    int this_cost = insn_cost (CONST_CAST_RTX_INSN (seq), speed);
+	    if (this_cost > 0)
+	      cost += this_cost;
+	    else
+	      cost++;
+	  }
+      }
+
+  return cost;
+}
+
+/* Expand a vector initialization sequence, such that TARGET is
+   initialized to contain VALS.  */
+
+void
+aarch64_expand_vector_init (rtx target, rtx vals)
+{
+  /* Try decomposing the initializer into even and odd halves and
+     then ZIP them together.  Use the resulting sequence if it is
+     strictly cheaper than loading VALS directly.
+
+     Prefer the fallback sequence in the event of a tie, since it
+     will tend to use fewer registers.  */
+
+  machine_mode mode = GET_MODE (target);
+  int n_elts = XVECLEN (vals, 0);
+
+  if (n_elts < 4
+      || maybe_ne (GET_MODE_BITSIZE (mode), 128))
+    {
+      aarch64_expand_vector_init_fallback (target, vals);
+      return;
+    }
+
+  start_sequence ();
+  rtx halves[2];
+  unsigned costs[2];
+  for (int i = 0; i < 2; i++)
+    {
+      start_sequence ();
+      rtx new_vals = aarch64_unzip_vector_init (mode, vals, i == 0);
+      rtx tmp_reg = gen_reg_rtx (GET_MODE (new_vals));
+      aarch64_expand_vector_init (tmp_reg, new_vals);
+      halves[i] = gen_rtx_SUBREG (mode, tmp_reg, 0);
+      rtx_insn *rec_seq = get_insns ();
+      end_sequence ();
+      costs[i] = seq_cost_ignoring_scalar_moves (rec_seq, !optimize_size);
+      emit_insn (rec_seq);
+    }
+
+  rtvec v = gen_rtvec (2, halves[0], halves[1]);
+  rtx_insn *zip1_insn
+    = emit_set_insn (target, gen_rtx_UNSPEC (mode, v, UNSPEC_ZIP1));
+  unsigned seq_total_cost
+    = (!optimize_size) ? std::max (costs[0], costs[1]) : costs[0] + costs[1];
+  seq_total_cost += insn_cost (zip1_insn, !optimize_size);
+
+  rtx_insn *seq = get_insns ();
+  end_sequence ();
+
+  start_sequence ();
+  aarch64_expand_vector_init_fallback (target, vals);
+  rtx_insn *fallback_seq = get_insns ();
+  unsigned fallback_seq_cost
+    = seq_cost_ignoring_scalar_moves (fallback_seq, !optimize_size);
+  end_sequence ();
+
+  emit_insn (seq_total_cost < fallback_seq_cost ? seq : fallback_seq);
 }
 
 /* Emit RTL corresponding to:
@@ -24692,6 +24865,18 @@ aarch64_modes_tieable_p (machine_mode mode1, machine_mode mode2)
     return false;
 
   if (GET_MODE_CLASS (mode1) == GET_MODE_CLASS (mode2))
+    return true;
+
+  /* Allow changes between scalar modes if both modes fit within 64 bits.
+     This is because:
+
+     - We allow all such modes for both FPRs and GPRs.
+     - They occupy a single register for both FPRs and GPRs.
+     - We can reinterpret one mode as another in both types of register.  */
+  if (is_a<scalar_mode> (mode1)
+      && is_a<scalar_mode> (mode2)
+      && known_le (GET_MODE_SIZE (mode1), 8)
+      && known_le (GET_MODE_SIZE (mode2), 8))
     return true;
 
   /* We specifically want to allow elements of "structure" modes to
@@ -27430,6 +27615,44 @@ aarch64_output_load_tp (rtx dest)
 	    tpidrs[aarch64_tpidr_register]);
   output_asm_insn (buffer, &dest);
   return "";
+}
+
+/* Set up the value of REG_ALLOC_ORDER from scratch.
+
+   It was previously good practice to put call-clobbered registers ahead
+   of call-preserved registers, but that isn't necessary these days.
+   IRA's model of register save/restore costs is much more sophisticated
+   than the model that a simple ordering could provide.  We leave
+   HONOR_REG_ALLOC_ORDER undefined so that we can get the full benefit
+   of IRA's model.
+
+   However, it is still useful to list registers that are members of
+   multiple classes after registers that are members of fewer classes.
+   For example, we have:
+
+   - FP_LO8_REGS: v0-v7
+   - FP_LO_REGS: v0-v15
+   - FP_REGS: v0-v31
+
+   If, as a tie-breaker, we allocate FP_REGS in the order v0-v31,
+   we run the risk of starving other (lower-priority) pseudos that
+   require FP_LO8_REGS or FP_LO_REGS.  Allocating FP_LO_REGS in the
+   order v0-v15 could similarly starve pseudos that require FP_LO8_REGS.
+   Allocating downwards rather than upwards avoids this problem, at least
+   in code that has reasonable register pressure.
+
+   The situation for predicate registers is similar.  */
+
+void
+aarch64_adjust_reg_alloc_order ()
+{
+  for (int i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
+    if (IN_RANGE (i, V0_REGNUM, V31_REGNUM))
+      reg_alloc_order[i] = V31_REGNUM - (i - V0_REGNUM);
+    else if (IN_RANGE (i, P0_REGNUM, P15_REGNUM))
+      reg_alloc_order[i] = P15_REGNUM - (i - P0_REGNUM);
+    else
+      reg_alloc_order[i] = i;
 }
 
 /* Target-specific selftests.  */

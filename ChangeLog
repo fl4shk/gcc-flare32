@@ -1,3 +1,49 @@
+2023-05-18  Eugene Rozenfeld  <erozen@microsoft.com>
+
+	* Makefile.tpl: Disable warnings as errors for STAGEautofeedback
+	* Makefile.in: Regenerate
+
+2023-05-17  Eugene Rozenfeld  <erozen@microsoft.com>
+
+	* Makefile.in: Disable warnings as errors for STAGEautofeedback
+
+2023-05-11  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* MAINTAINERS: Sort.
+
+2023-05-11  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* MAINTAINERS: Add myself.
+
+2023-05-10  Pan Li  <pan2.li@intel.com>
+
+	* MAINTAINERS: Add myself.
+
+2023-04-28  Eugene Rozenfeld  <erozen@microsoft.com>
+
+	* Makefile.in: Define PROFILE_MERGER
+	* Makefile.tpl: Define PROFILE_MERGER
+
+2023-04-27  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* MAINTAINERS: Change my email address.
+
+2023-04-26  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* MAINTAINERS: Add myself.
+
+2023-04-26  Martin Liska  <mliska@suse.cz>
+
+	* MAINTAINERS: fix sorting
+
+2023-04-25  Victor Do Nascimento  <victor.donascimento@arm.com>
+
+	* MAINTAINERS (Write After Approval): Add myself.
+
+2023-04-24  Martin Liska  <mliska@suse.cz>
+
+	* MAINTAINERS: Fix sorting.
+
 2023-04-21  Peter Foley  <pefoley2@pefoley.com>
 
 	* configure: Regenerate.

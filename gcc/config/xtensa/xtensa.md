@@ -170,15 +170,24 @@
    (set_attr "mode"	"SI")
    (set_attr "length"	"2,2,3,3,3")])
 
-(define_insn "*addx"
+(define_insn "*addsubx"
   [(set (match_operand:SI 0 "register_operand" "=a")
-	(plus:SI (ashift:SI (match_operand:SI 1 "register_operand" "r")
+	(match_operator:SI 4 "addsub_operator"
+		[(ashift:SI (match_operand:SI 1 "register_operand" "r")
 			    (match_operand:SI 3 "addsubx_operand" "i"))
-		 (match_operand:SI 2 "register_operand" "r")))]
+		 (match_operand:SI 2 "register_operand" "r")]))]
   "TARGET_ADDX"
 {
   operands[3] = GEN_INT (1 << INTVAL (operands[3]));
-  return "addx%3\t%0, %1, %2";
+  switch (GET_CODE (operands[4]))
+    {
+    case PLUS:
+      return "addx%3\t%0, %1, %2";
+    case MINUS:
+      return "subx%3\t%0, %1, %2";
+    default:
+      gcc_unreachable ();
+    }
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
@@ -207,19 +216,29 @@
    (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
 
-(define_insn "*subx"
+(define_insn_and_split "*subsi3_from_const"
   [(set (match_operand:SI 0 "register_operand" "=a")
-	(minus:SI (ashift:SI (match_operand:SI 1 "register_operand" "r")
-			     (match_operand:SI 3 "addsubx_operand" "i"))
+	(minus:SI (match_operand:SI 1 "const_int_operand" "i")
 		  (match_operand:SI 2 "register_operand" "r")))]
-  "TARGET_ADDX"
+  "xtensa_simm8 (-INTVAL (operands[1]))
+   || xtensa_simm8x256 (-INTVAL (operands[1]))"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(plus:SI (match_dup 2)
+		 (match_dup 1)))
+   (set (match_dup 0)
+	(neg:SI (match_dup 0)))]
 {
-  operands[3] = GEN_INT (1 << INTVAL (operands[3]));
-  return "subx%3\t%0, %1, %2";
+  operands[1] = GEN_INT (-INTVAL (operands[1]));
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3")])
+   (set (attr "length")
+	(if_then_else (match_test "TARGET_DENSITY
+				   && xtensa_m1_or_1_thru_15 (-INTVAL (operands[1]))")
+		      (const_int 5)
+		      (const_int 6)))])
 
 (define_insn "subsf3"
   [(set (match_operand:SF 0 "register_operand" "=f")
@@ -997,6 +1016,90 @@
    (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
 
+(define_insn_and_split "*extzvsi-1bit_ashlsi3"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(and:SI (match_operator:SI 4 "logical_shift_operator"
+			[(match_operand:SI 1 "register_operand" "r")
+			 (match_operand:SI 2 "const_int_operand" "i")])
+		(match_operand:SI 3 "const_int_operand" "i")))]
+  "exact_log2 (INTVAL (operands[3])) > 0"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(zero_extract:SI (match_dup 1)
+			 (const_int 1)
+			 (match_dup 2)))
+   (set (match_dup 0)
+	(ashift:SI (match_dup 0)
+		   (match_dup 3)))]
+{
+  int pos = INTVAL (operands[2]), shift = floor_log2 (INTVAL (operands[3]));
+  switch (GET_CODE (operands[4]))
+    {
+    case ASHIFT:
+      pos = shift - pos;
+      break;
+    case LSHIFTRT:
+      pos = shift + pos;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  if (BITS_BIG_ENDIAN)
+    pos = (32 - (1 + pos)) & 0x1f;
+  operands[2] = GEN_INT (pos);
+  operands[3] = GEN_INT (shift);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set (attr "length")
+        (if_then_else (match_test "TARGET_DENSITY && INTVAL (operands[3]) == 2")
+		      (const_int 5)
+		      (const_int 6)))])
+
+(define_insn_and_split "*extzvsi-1bit_addsubx"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(match_operator:SI 5 "addsub_operator"
+		[(and:SI (match_operator:SI 6 "logical_shift_operator"
+				[(match_operand:SI 1 "register_operand" "r")
+				 (match_operand:SI 3 "const_int_operand" "i")])
+			 (match_operand:SI 4 "const_int_operand" "i"))
+		 (match_operand:SI 2 "register_operand" "r")]))]
+  "TARGET_ADDX
+   && IN_RANGE (exact_log2 (INTVAL (operands[4])), 1, 3)"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(zero_extract:SI (match_dup 1)
+			 (const_int 1)
+			 (match_dup 3)))
+   (set (match_dup 0)
+	(match_op_dup 5
+		[(ashift:SI (match_dup 0)
+			    (match_dup 4))
+		 (match_dup 2)]))]
+{
+  int pos = INTVAL (operands[3]), shift = floor_log2 (INTVAL (operands[4]));
+  switch (GET_CODE (operands[6]))
+    {
+    case ASHIFT:
+      pos = shift - pos;
+      break;
+    case LSHIFTRT:
+      pos = shift + pos;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  if (BITS_BIG_ENDIAN)
+    pos = (32 - (1 + pos)) & 0x1f;
+  operands[3] = GEN_INT (pos);
+  operands[4] = GEN_INT (shift);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"6")])
+
 
 ;; Conversions.
 
@@ -1444,9 +1547,7 @@
    (match_operand:SI 3 "const_int_operand")]
   "!optimize_debug && optimize"
 {
-  if (xtensa_expand_block_set_unrolled_loop (operands))
-    DONE;
-  if (xtensa_expand_block_set_small_loop (operands))
+  if (xtensa_expand_block_set (operands))
     DONE;
   FAIL;
 })

@@ -290,11 +290,12 @@ gigi (Node_Id gnat_root,
       struct List_Header *list_headers_ptr,
       Nat number_file,
       struct File_Info_Type *file_info_ptr,
+      Entity_Id standard_address,
       Entity_Id standard_boolean,
-      Entity_Id standard_integer,
       Entity_Id standard_character,
-      Entity_Id standard_long_long_float,
       Entity_Id standard_exception_type,
+      Entity_Id standard_integer,
+      Entity_Id standard_long_long_float,
       Int gigi_operating_mode)
 {
   Node_Id gnat_iter;
@@ -375,14 +376,19 @@ gigi (Node_Id gnat_root,
   double_float_alignment = get_target_double_float_alignment ();
   double_scalar_alignment = get_target_double_scalar_alignment ();
 
-  /* Record the builtin types.  Define `integer' and `character' first so that
-     dbx will output them first.  */
+  /* Record the builtin types.  */
+  record_builtin_type ("address", pointer_sized_int_node, false);
   record_builtin_type ("integer", integer_type_node, false);
   record_builtin_type ("character", char_type_node, false);
   record_builtin_type ("boolean", boolean_type_node, false);
   record_builtin_type ("void", void_type_node, false);
 
-  /* Save the type we made for integer as the type for Standard.Integer.  */
+  /* Save the type we made for address as the type for Standard.Address.  */
+  save_gnu_tree (Base_Type (standard_address),
+		 TYPE_NAME (pointer_sized_int_node),
+		 false);
+
+  /* Likewise for integer as the type for Standard.Integer.  */
   save_gnu_tree (Base_Type (standard_integer),
 		 TYPE_NAME (integer_type_node),
 		 false);
@@ -1241,7 +1247,7 @@ Identifier_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p)
       /* Do the final dereference.  */
       gnu_result = build_unary_op (INDIRECT_REF, NULL_TREE, gnu_result);
 
-      if ((TREE_CODE (gnu_result) == INDIRECT_REF
+      if ((INDIRECT_REF_P (gnu_result)
 	   || TREE_CODE (gnu_result) == UNCONSTRAINED_ARRAY_REF)
 	  && No (Address_Clause (gnat_entity)))
 	TREE_THIS_NOTRAP (gnu_result) = 1;
@@ -3391,7 +3397,7 @@ struct nrv_data
 static inline bool
 is_nrv_p (bitmap nrv, tree t)
 {
-  return TREE_CODE (t) == VAR_DECL && bitmap_bit_p (nrv, DECL_UID (t));
+  return VAR_P (t) && bitmap_bit_p (nrv, DECL_UID (t));
 }
 
 /* Helper function for walk_tree, used by finalize_nrv below.  */
@@ -4136,7 +4142,7 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
        gnat_param = Next_Formal_With_Extras (gnat_param))
     {
       tree gnu_param = get_gnu_tree (gnat_param);
-      bool is_var_decl = (TREE_CODE (gnu_param) == VAR_DECL);
+      bool is_var_decl = VAR_P (gnu_param);
 
       annotate_object (gnat_param, TREE_TYPE (gnu_param), NULL_TREE,
 		       DECL_BY_REF_P (gnu_param));
@@ -6908,7 +6914,7 @@ gnat_to_gnu (Node_Id gnat_node)
 	    && TYPE_CONTAINS_TEMPLATE_P (gnu_result_type))
 	  gnu_aggr_type
 	    = TREE_TYPE (DECL_CHAIN (TYPE_FIELDS (gnu_result_type)));
-	else if (TREE_CODE (gnu_result_type) == VECTOR_TYPE)
+	else if (VECTOR_TYPE_P (gnu_result_type))
 	  gnu_aggr_type = TYPE_REPRESENTATIVE_ARRAY (gnu_result_type);
 	else
 	  gnu_aggr_type = gnu_result_type;
@@ -7740,7 +7746,7 @@ gnat_to_gnu (Node_Id gnat_node)
 		gnu_result = build2 (INIT_EXPR, void_type_node,
 				     gnu_ret_deref, gnu_ret_val);
 		/* Avoid a useless copy with __builtin_return_slot.  */
-		if (TREE_CODE (gnu_ret_val) == INDIRECT_REF)
+		if (INDIRECT_REF_P (gnu_ret_val))
 		  gnu_result
 		    = build3 (COND_EXPR, void_type_node,
 			      fold_build2 (NE_EXPR, boolean_type_node,
@@ -8415,7 +8421,7 @@ gnat_to_gnu (Node_Id gnat_node)
 
   /* If we're supposed to return something of void_type, it means we have
      something we're elaborating for effect, so just return.  */
-  if (TREE_CODE (gnu_result_type) == VOID_TYPE)
+  if (VOID_TYPE_P (gnu_result_type))
     return gnu_result;
 
   /* If the result is a constant that overflowed, raise Constraint_Error.  */
@@ -8588,7 +8594,7 @@ gnat_to_gnu_external (Node_Id gnat_node)
     current_function_decl = NULL_TREE;
 
   /* Do not import locations from external units.  */
-  if (gnu_result && EXPR_P (gnu_result))
+  if (CAN_HAVE_LOCATION_P (gnu_result))
     SET_EXPR_LOCATION (gnu_result, UNKNOWN_LOCATION);
 
   return gnu_result;
@@ -8722,7 +8728,7 @@ add_decl_expr (tree gnu_decl, Node_Id gnat_node)
 	 Note that walk_tree knows how to deal with TYPE_DECL, but neither
 	 VAR_DECL nor CONST_DECL.  This appears to be somewhat arbitrary.  */
       MARK_VISITED (gnu_stmt);
-      if (TREE_CODE (gnu_decl) == VAR_DECL
+      if (VAR_P (gnu_decl)
 	  || TREE_CODE (gnu_decl) == CONST_DECL)
 	{
 	  MARK_VISITED (DECL_SIZE (gnu_decl));
@@ -8739,7 +8745,7 @@ add_decl_expr (tree gnu_decl, Node_Id gnat_node)
       && !TYPE_FAT_POINTER_P (type))
     MARK_VISITED (TYPE_ADA_SIZE (type));
 
-  if (TREE_CODE (gnu_decl) == VAR_DECL && (gnu_init = DECL_INITIAL (gnu_decl)))
+  if (VAR_P (gnu_decl) && (gnu_init = DECL_INITIAL (gnu_decl)))
     {
       /* If this is a variable and an initializer is attached to it, it must be
 	 valid for the context.  Similar to init_const in create_var_decl.  */
@@ -9000,7 +9006,7 @@ gnat_gimplify_expr (tree *expr_p, gimple_seq *pre_p,
 
       /* The expressions for the RM bounds must be gimplified to ensure that
 	 they are properly elaborated.  See gimplify_decl_expr.  */
-      if ((TREE_CODE (op) == TYPE_DECL || TREE_CODE (op) == VAR_DECL)
+      if ((TREE_CODE (op) == TYPE_DECL || VAR_P (op))
 	  && !TYPE_SIZES_GIMPLIFIED (TREE_TYPE (op))
 	  && (INTEGRAL_TYPE_P (TREE_TYPE (op))
 	      || SCALAR_FLOAT_TYPE_P (TREE_TYPE (op))))

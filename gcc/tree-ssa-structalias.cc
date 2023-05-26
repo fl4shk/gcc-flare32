@@ -5831,8 +5831,7 @@ type_must_have_pointers (tree type)
 
   /* A function or method can have pointers as arguments, so track
      those separately.  */
-  if (TREE_CODE (type) == FUNCTION_TYPE
-      || TREE_CODE (type) == METHOD_TYPE)
+  if (FUNC_OR_METHOD_TYPE_P (type))
     return true;
 
   return false;
@@ -7568,7 +7567,7 @@ compute_points_to_sets (void)
   edge_iterator ei;
   edge e;
   FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
-    if (greturn *ret = safe_dyn_cast <greturn *> (last_stmt (e->src)))
+    if (greturn *ret = safe_dyn_cast <greturn *> (*gsi_last_bb (e->src)))
       {
 	tree val = gimple_return_retval (ret);
 	/* ???  Easy to handle simple indirections with some work.

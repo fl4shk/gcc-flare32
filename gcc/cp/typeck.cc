@@ -4996,8 +4996,8 @@ do_warn_enum_conversions (location_t loc, enum tree_code code, tree type0,
 	}
     }
   else if ((TREE_CODE (type0) == ENUMERAL_TYPE
-	    && TREE_CODE (type1) == REAL_TYPE)
-	   || (TREE_CODE (type0) == REAL_TYPE
+	    && SCALAR_FLOAT_TYPE_P (type1))
+	   || (SCALAR_FLOAT_TYPE_P (type0)
 	       && TREE_CODE (type1) == ENUMERAL_TYPE))
     {
       const bool enum_first_p = TREE_CODE (type0) == ENUMERAL_TYPE;
@@ -11236,9 +11236,6 @@ check_return_expr (tree retval, bool *no_warning)
 			 build_zero_cst (TREE_TYPE (retval)));
     }
 
-  if (processing_template_decl)
-    return saved_retval;
-
   /* A naive attempt to reduce the number of -Wdangling-reference false
      positives: if we know that this function can return a variable with
      static storage duration rather than one of its parameters, suppress
@@ -11249,6 +11246,9 @@ check_return_expr (tree retval, bool *no_warning)
       && VAR_P (bare_retval)
       && TREE_STATIC (bare_retval))
     suppress_warning (current_function_decl, OPT_Wdangling_reference);
+
+  if (processing_template_decl)
+    return saved_retval;
 
   /* Actually copy the value returned into the appropriate location.  */
   if (retval && retval != result)

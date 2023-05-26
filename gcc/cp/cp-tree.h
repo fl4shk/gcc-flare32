@@ -49,7 +49,7 @@ c-common.h, not after.
    but not all node kinds do (e.g. constants, and references to
    params, locals, etc), so we stash a copy here.  */
 
-extern location_t cp_expr_location		(const_tree);
+inline location_t cp_expr_location		(const_tree);
 
 class cp_expr
 {
@@ -1636,7 +1636,7 @@ check_constraint_info (tree t)
    holds the set of template parameters that were in-scope when this 'auto'
    was formed.  */
 #define PLACEHOLDER_TYPE_CONSTRAINTS_INFO(NODE) \
-  DECL_SIZE_UNIT (TYPE_NAME (NODE))
+  DECL_SIZE_UNIT (TYPE_NAME (TEMPLATE_TYPE_PARM_CHECK (NODE)))
 
 /* The constraints on the 'auto' placeholder type NODE.  */
 #define PLACEHOLDER_TYPE_CONSTRAINTS(NODE)		   \
@@ -3189,7 +3189,7 @@ struct GTY(()) lang_decl {
 
 /* Nonzero if NODE has DECL_DISCRIMINATOR and not DECL_ACCESS.  */
 #define DECL_DISCRIMINATOR_P(NODE)				\
-  (((TREE_CODE (NODE) == VAR_DECL && TREE_STATIC (NODE))	\
+  (((VAR_P (NODE) && TREE_STATIC (NODE))	\
     || DECL_IMPLICIT_TYPEDEF_P (NODE))				\
    && DECL_FUNCTION_SCOPE_P (NODE))
 
@@ -4453,7 +4453,7 @@ get_vec_init_expr (tree t)
    Keep these checks in ascending code order.  */
 #define ARITHMETIC_TYPE_P(TYPE) \
   (CP_INTEGRAL_TYPE_P (TYPE) \
-   || TREE_CODE (TYPE) == REAL_TYPE \
+   || SCALAR_FLOAT_TYPE_P (TYPE) \
    || TREE_CODE (TYPE) == COMPLEX_TYPE)
 
 /* [basic.types]
@@ -5084,7 +5084,7 @@ get_vec_init_expr (tree t)
    templates are primary, too.  */
 
 /* Returns the primary template corresponding to these parameters.  */
-#define TPARMS_PRIMARY_TEMPLATE(NODE) (TREE_TYPE (NODE))
+#define TPARMS_PRIMARY_TEMPLATE(NODE) (TREE_TYPE (TREE_VEC_CHECK (NODE)))
 
 #define DECL_PRIMARY_TEMPLATE(NODE) \
   (TPARMS_PRIMARY_TEMPLATE (DECL_INNERMOST_TEMPLATE_PARMS (NODE)))
@@ -6098,7 +6098,7 @@ const unsigned int STF_STRIP_DEPENDENT = 1U << 1;
 #define TEMPLATE_TEMPLATE_PARM_TEMPLATE_DECL(NODE)	\
   ((TREE_CODE (NODE) == BOUND_TEMPLATE_TEMPLATE_PARM)	\
    ? TYPE_TI_TEMPLATE (NODE)				\
-   : TYPE_NAME (NODE))
+   : TYPE_NAME (TEMPLATE_TEMPLATE_PARM_CHECK (NODE)))
 
 /* in lex.cc  */
 
@@ -7515,7 +7515,8 @@ extern tree build_if_nonnull			(tree, tree, tsubst_flags_t);
 extern tree get_parent_with_private_access 	(tree decl, tree binfo);
 extern bool accessible_base_p			(tree, tree, bool);
 extern tree lookup_base                         (tree, tree, base_access,
-						 base_kind *, tsubst_flags_t);
+						 base_kind *, tsubst_flags_t,
+						 HOST_WIDE_INT = -1);
 extern tree dcast_base_hint			(tree, tree);
 extern int accessible_p				(tree, tree, bool);
 extern int accessible_in_template_p		(tree, tree);
@@ -8161,6 +8162,30 @@ inline location_t
 loc_or_input_loc (location_t loc)
 {
   return loc == UNKNOWN_LOCATION ? input_location : loc;
+}
+
+/* Like EXPR_LOCATION, but also handle some tcc_exceptional that have
+   locations.  */
+
+inline location_t
+cp_expr_location (const_tree t_)
+{
+  tree t = CONST_CAST_TREE (t_);
+  if (t == NULL_TREE)
+    return UNKNOWN_LOCATION;
+  switch (TREE_CODE (t))
+    {
+    case LAMBDA_EXPR:
+      return LAMBDA_EXPR_LOCATION (t);
+    case STATIC_ASSERT:
+      return STATIC_ASSERT_SOURCE_LOCATION (t);
+    case TRAIT_EXPR:
+      return TRAIT_EXPR_LOCATION (t);
+    case PTRMEM_CST:
+      return PTRMEM_CST_LOCATION (t);
+    default:
+      return EXPR_LOCATION (t);
+    }
 }
 
 inline location_t

@@ -818,6 +818,13 @@ public:
      the vector loop can handle fewer than VF scalars.  */
   bool using_partial_vectors_p;
 
+  /* True if we've decided to use a decrementing loop control IV that counts
+     scalars. This can be done for any loop that:
+
+	(a) uses length "controls"; and
+	(b) can iterate more than once.  */
+  bool using_decrementing_iv_p;
+
   /* True if we've decided to use partially-populated vectors for the
      epilogue of loop.  */
   bool epil_using_partial_vectors_p;
@@ -890,6 +897,7 @@ public:
 #define LOOP_VINFO_VECTORIZABLE_P(L)       (L)->vectorizable
 #define LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P(L) (L)->can_use_partial_vectors_p
 #define LOOP_VINFO_USING_PARTIAL_VECTORS_P(L) (L)->using_partial_vectors_p
+#define LOOP_VINFO_USING_DECREMENTING_IV_P(L) (L)->using_decrementing_iv_p
 #define LOOP_VINFO_EPIL_USING_PARTIAL_VECTORS_P(L)                             \
   (L)->epil_using_partial_vectors_p
 #define LOOP_VINFO_PARTIAL_LOAD_STORE_BIAS(L) (L)->partial_load_store_bias
@@ -2293,8 +2301,9 @@ extern tree vect_get_loop_mask (gimple_stmt_iterator *, vec_loop_masks *,
 				unsigned int, tree, unsigned int);
 extern void vect_record_loop_len (loop_vec_info, vec_loop_lens *, unsigned int,
 				  tree, unsigned int);
-extern tree vect_get_loop_len (loop_vec_info, vec_loop_lens *, unsigned int,
-			       unsigned int);
+extern tree vect_get_loop_len (loop_vec_info, gimple_stmt_iterator *,
+			       vec_loop_lens *, unsigned int, tree,
+			       unsigned int, unsigned int);
 extern gimple_seq vect_gen_len (tree, tree, tree, tree);
 extern stmt_vec_info info_for_reduction (vec_info *, stmt_vec_info);
 extern bool reduction_fn_for_scalar_code (code_helper, internal_fn *);

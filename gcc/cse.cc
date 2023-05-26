@@ -248,10 +248,8 @@ struct qty_table_elem
   rtx comparison_const;
   int comparison_qty;
   unsigned int first_reg, last_reg;
-  /* The sizes of these fields should match the sizes of the
-     code and mode fields of struct rtx_def (see rtl.h).  */
-  ENUM_BITFIELD(rtx_code) comparison_code : 16;
-  ENUM_BITFIELD(machine_mode) mode : 8;
+  ENUM_BITFIELD(machine_mode) mode : MACHINE_MODE_BITSIZE;
+  ENUM_BITFIELD(rtx_code) comparison_code : RTX_CODE_BITSIZE;
 };
 
 /* The table of all qtys, indexed by qty number.  */
@@ -404,9 +402,7 @@ struct table_elt
   struct table_elt *related_value;
   int cost;
   int regcost;
-  /* The size of this field should match the size
-     of the mode field of struct rtx_def (see rtl.h).  */
-  ENUM_BITFIELD(machine_mode) mode : 8;
+  ENUM_BITFIELD(machine_mode) mode : MACHINE_MODE_BITSIZE;
   char in_memory;
   char is_const;
   char flag;
@@ -418,20 +414,6 @@ struct table_elt
 #define HASH_SHIFT	5
 #define HASH_SIZE	(1 << HASH_SHIFT)
 #define HASH_MASK	(HASH_SIZE - 1)
-
-/* Compute hash code of X in mode M.  Special-case case where X is a pseudo
-   register (hard registers may require `do_not_record' to be set).  */
-
-#define HASH(X, M)	\
- ((REG_P (X) && REGNO (X) >= FIRST_PSEUDO_REGISTER	\
-  ? (((unsigned) REG << 7) + (unsigned) REG_QTY (REGNO (X)))	\
-  : canon_hash (X, M)) & HASH_MASK)
-
-/* Like HASH, but without side-effects.  */
-#define SAFE_HASH(X, M)	\
- ((REG_P (X) && REGNO (X) >= FIRST_PSEUDO_REGISTER	\
-  ? (((unsigned) REG << 7) + (unsigned) REG_QTY (REGNO (X)))	\
-  : safe_hash (X, M)) & HASH_MASK)
 
 /* Determine whether register number N is considered a fixed register for the
    purpose of approximating register costs.
@@ -585,6 +567,29 @@ static machine_mode cse_cc_succs (basic_block, basic_block, rtx, rtx,
 
 static const struct rtl_hooks cse_rtl_hooks = RTL_HOOKS_INITIALIZER;
 
+/* Compute hash code of X in mode M.  Special-case case where X is a pseudo
+   register (hard registers may require `do_not_record' to be set).  */
+
+static inline unsigned
+HASH (rtx x, machine_mode mode)
+{
+  unsigned h = (REG_P (x) && REGNO (x) >= FIRST_PSEUDO_REGISTER
+		? (((unsigned) REG << 7) + (unsigned) REG_QTY (REGNO (x)))
+		: canon_hash (x, mode));
+  return (h ^ (h >> HASH_SHIFT)) & HASH_MASK;
+}
+
+/* Like HASH, but without side-effects.  */
+
+static inline unsigned
+SAFE_HASH (rtx x, machine_mode mode)
+{
+  unsigned h = (REG_P (x) && REGNO (x) >= FIRST_PSEUDO_REGISTER
+		? (((unsigned) REG << 7) + (unsigned) REG_QTY (REGNO (x)))
+		: safe_hash (x, mode));
+  return (h ^ (h >> HASH_SHIFT)) & HASH_MASK;
+}
+
 /* Nonzero if X has the form (PLUS frame-pointer integer).  */
 
 static bool
@@ -4143,10 +4148,8 @@ struct set
   /* Nonzero if the SET_SRC contains something
      whose value cannot be predicted and understood.  */
   char src_volatile;
-  /* Original machine mode, in case it becomes a CONST_INT.
-     The size of this field should match the size of the mode
-     field of struct rtx_def (see rtl.h).  */
-  ENUM_BITFIELD(machine_mode) mode : 8;
+  /* Original machine mode, in case it becomes a CONST_INT.  */
+  ENUM_BITFIELD(machine_mode) mode : MACHINE_MODE_BITSIZE;
   /* Hash value of constant equivalent for SET_SRC.  */
   unsigned src_const_hash;
   /* A constant equivalent for SET_SRC, if any.  */
@@ -4614,6 +4617,7 @@ cse_insn (rtx_insn *insn)
       rtx src_eqv_here;
       rtx src_const = 0;
       rtx src_related = 0;
+      rtx dest_related = 0;
       bool src_related_is_const_anchor = false;
       struct table_elt *src_const_elt = 0;
       int src_cost = MAX_COST;
@@ -5085,10 +5089,11 @@ cse_insn (rtx_insn *insn)
 	    src_related = 0;
 
 	  /* This is the same as the destination of the insns, we want
-	     to prefer it.  Copy it to src_related.  The code below will
-	     then give it a negative cost.  */
-	  if (GET_CODE (dest) == code && rtx_equal_p (p->exp, dest))
-	    src_related = p->exp;
+	     to prefer it.  The code below will then give it a negative
+	     cost.  */
+	  if (!dest_related
+	      && GET_CODE (dest) == code && rtx_equal_p (p->exp, dest))
+	    dest_related = p->exp;
 	}
 
       /* Find the cheapest valid equivalent, trying all the available
@@ -5130,27 +5135,28 @@ cse_insn (rtx_insn *insn)
 	    }
 	}
 
-      if (src_related)
+      if (dest_related)
 	{
-	  if (rtx_equal_p (src_related, dest))
-	    src_related_cost = src_related_regcost = -1;
-	  else
-	    {
-	      src_related_cost = COST (src_related, mode);
-	      src_related_regcost = approx_reg_cost (src_related);
+	  src_related_cost = src_related_regcost = -1;
+	  /* Handle it as src_related.  */
+	  src_related = dest_related;
+	}
+      else if (src_related)
+	{
+	  src_related_cost = COST (src_related, mode);
+	  src_related_regcost = approx_reg_cost (src_related);
 
-	      /* If a const-anchor is used to synthesize a constant that
-		 normally requires multiple instructions then slightly prefer
-		 it over the original sequence.  These instructions are likely
-		 to become redundant now.  We can't compare against the cost
-		 of src_eqv_here because, on MIPS for example, multi-insn
-		 constants have zero cost; they are assumed to be hoisted from
-		 loops.  */
-	      if (src_related_is_const_anchor
-		  && src_related_cost == src_cost
-		  && src_eqv_here)
-		src_related_cost--;
-	    }
+	  /* If a const-anchor is used to synthesize a constant that
+	     normally requires multiple instructions then slightly prefer
+	     it over the original sequence.  These instructions are likely
+	     to become redundant now.  We can't compare against the cost
+	     of src_eqv_here because, on MIPS for example, multi-insn
+	     constants have zero cost; they are assumed to be hoisted from
+	     loops.  */
+	  if (src_related_is_const_anchor
+	      && src_related_cost == src_cost
+	      && src_eqv_here)
+	    src_related_cost--;
 	}
 
       /* If this was an indirect jump insn, a known label will really be

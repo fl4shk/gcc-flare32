@@ -309,12 +309,25 @@ public:
 class GTY(()) ipa_vr
 {
 public:
-  /* The data fields below are valid only if known is true.  */
-  bool known;
-  enum value_range_kind type;
-  wide_int min;
-  wide_int max;
-  bool nonzero_p (tree) const;
+  ipa_vr ();
+  ipa_vr (const vrange &);
+  void set_unknown ();
+  bool known_p () const { return m_storage != NULL; }
+  tree type () const { return m_type; }
+  void get_vrange (vrange &) const;
+  bool equal_p (const vrange &) const;
+  const vrange_storage *storage () const { return m_storage; }
+  void streamer_read (lto_input_block *, data_in *);
+  void streamer_write (output_block *) const;
+  void dump (FILE *) const;
+
+private:
+  friend void gt_pch_nx (struct ipa_vr &);
+  friend void gt_ggc_mx (struct ipa_vr &);
+  friend void gt_pch_nx (struct ipa_vr *, gt_pointer_operator, void *);
+
+  vrange_storage *m_storage;
+  tree m_type;
 };
 
 /* A jump function for a callsite represents the values passed as actual
@@ -1200,5 +1213,22 @@ tree build_ref_for_offset (location_t, tree, poly_int64, bool, tree,
 
 /* In ipa-cp.cc  */
 void ipa_cp_cc_finalize (void);
+
+/* Set R to the range of [VAL, VAL] while normalizing addresses to
+   non-zero.  */
+
+inline void
+ipa_range_set_and_normalize (irange &r, tree val)
+{
+  if (TREE_CODE (val) == INTEGER_CST)
+    {
+      wide_int w = wi::to_wide (val);
+      r.set (TREE_TYPE (val), w, w);
+    }
+  else if (TREE_CODE (val) == ADDR_EXPR)
+    r.set_nonzero (TREE_TYPE (val));
+  else
+    r.set_varying (TREE_TYPE (val));
+}
 
 #endif /* IPA_PROP_H */

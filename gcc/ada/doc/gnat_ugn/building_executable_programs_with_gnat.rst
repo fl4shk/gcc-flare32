@@ -2801,6 +2801,8 @@ of the pragma in the :title:`GNAT_Reference_manual`).
 
   * :switch:`-gnatw.s` (overridden size clause)
 
+  * :switch:`-gnatw_s` (ineffective predicate test)
+
   * :switch:`-gnatwt` (tracking of deleted conditional code)
 
   * :switch:`-gnatw.u` (unordered enumeration)
@@ -3834,6 +3836,25 @@ of the pragma in the :title:`GNAT_Reference_manual`).
   warnings when an array component size overrides a size clause.
 
 
+.. index:: -gnatw_s  (gcc)
+.. index:: Warnings
+
+:switch:`-gnatw_s`
+  *Activate warnings on ineffective predicate tests.*
+
+  This switch activates warnings on Static_Predicate aspect
+  specifications that test for values that do not belong to
+  the parent subtype. Not all such ineffective tests are detected.
+
+.. index:: -gnatw_S  (gcc)
+
+:switch:`-gnatw_S`
+  *Suppress warnings on ineffective predicate tests.*
+
+  This switch suppresses warnings on Static_Predicate aspect
+  specifications that test for values that do not belong to
+  the parent subtype.
+
 .. index:: -gnatwt  (gcc)
 .. index:: Deactivated code, warnings
 .. index:: Deleted code, warnings
@@ -4685,7 +4706,7 @@ Style Checking
 
 .. index:: -gnaty  (gcc)
 
-The :switch:`-gnatyx` switch causes the compiler to
+The :switch:`-gnaty` switch causes the compiler to
 enforce specified style rules. A limited set of style rules has been used
 in writing the GNAT sources themselves. This switch allows user programs
 to activate all or some of these checks. If the source program fails a
@@ -4883,9 +4904,9 @@ checks to be performed. The following checks are defined:
 
   The set of style check switches is set to match that used by the GNAT sources.
   This may be useful when developing code that is eventually intended to be
-  incorporated into GNAT. Currently this is equivalent to :switch:`-gnatyydISux`)
-  but additional style switches may be added to this set in the future without
-  advance notice.
+  incorporated into GNAT. Currently this is equivalent to
+  :switch:`-gnatyydISuxz`) but additional style switches may be added to this
+  set in the future without advance notice.
 
 
 .. index:: -gnatyh (gcc)
@@ -5186,9 +5207,9 @@ checks to be performed. The following checks are defined:
 :switch:`-gnatyx`
   *Check extra parentheses.*
 
-  Unnecessary extra level of parentheses (C-style) are not allowed
-  around conditions in ``if`` statements, ``while`` statements and
-  ``exit`` statements.
+  Unnecessary extra levels of parentheses (C-style) are not allowed
+  around conditions (or selection expressions) in ``if``, ``while``,
+  ``case``, and ``exit`` statements, as well as part of ranges.
 
 
 .. index:: -gnatyy (gcc)
@@ -5200,6 +5221,15 @@ checks to be performed. The following checks are defined:
   options enabled with the exception of :switch:`-gnatyB`, :switch:`-gnatyd`,
   :switch:`-gnatyI`, :switch:`-gnatyLnnn`, :switch:`-gnatyo`, :switch:`-gnatyO`,
   :switch:`-gnatyS`, :switch:`-gnatyu`, and :switch:`-gnatyx`.
+
+
+.. index:: -gnatyz (gcc)
+
+:switch:`-gnatyz`
+  *Check extra parentheses (operator precedence).*
+
+  Extra levels of parentheses that are not required by operator precedence
+  rules are flagged. See also ``-gnatyx``.
 
 
 .. index:: -gnaty- (gcc)
@@ -6785,7 +6815,7 @@ be presented in subsequent sections.
 
     The underlying scalar is set to a value consisting of repeated bytes, whose
     value corresponds to the given value. For example if ``BF`` is given,
-    then a 32-bit scalar value will be set to the bit patterm ``16#BFBFBFBF#``.
+    then a 32-bit scalar value will be set to the bit pattern ``16#BFBFBFBF#``.
 
   .. index:: GNAT_INIT_SCALARS
 

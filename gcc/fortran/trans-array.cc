@@ -880,7 +880,7 @@ is_pointer_array (tree expr)
       || GFC_CLASS_TYPE_P (TREE_TYPE (expr)))
     return false;
 
-  if (TREE_CODE (expr) == VAR_DECL
+  if (VAR_P (expr)
       && GFC_DECL_PTR_ARRAY_P (expr))
     return true;
 
@@ -888,7 +888,7 @@ is_pointer_array (tree expr)
       && GFC_DECL_PTR_ARRAY_P (expr))
     return true;
 
-  if (TREE_CODE (expr) == INDIRECT_REF
+  if (INDIRECT_REF_P (expr)
       && GFC_DECL_PTR_ARRAY_P (TREE_OPERAND (expr, 0)))
     return true;
 
@@ -3803,7 +3803,7 @@ gfc_conv_scalarized_array_ref (gfc_se * se, gfc_array_ref * ar,
     {
       if (TREE_CODE (info->descriptor) == COMPONENT_REF)
 	decl = info->descriptor;
-      else if (TREE_CODE (info->descriptor) == INDIRECT_REF)
+      else if (INDIRECT_REF_P (info->descriptor))
 	decl = TREE_OPERAND (info->descriptor, 0);
 
       if (decl == NULL_TREE)
@@ -4057,7 +4057,7 @@ gfc_conv_array_ref (gfc_se * se, gfc_array_ref * ar, gfc_expr *expr,
     {
       if (TREE_CODE (se->expr) == COMPONENT_REF)
 	decl = se->expr;
-      else if (TREE_CODE (se->expr) == INDIRECT_REF)
+      else if (INDIRECT_REF_P (se->expr))
 	decl = TREE_OPERAND (se->expr, 0);
       else
 	decl = se->expr;
@@ -4069,7 +4069,7 @@ gfc_conv_array_ref (gfc_se * se, gfc_array_ref * ar, gfc_expr *expr,
       if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (se->expr)))
 	{
 	  decl = se->expr;
-	  if (TREE_CODE (decl) == INDIRECT_REF)
+	  if (INDIRECT_REF_P (decl))
 	    decl = TREE_OPERAND (decl, 0);
 	}
       else
@@ -4982,7 +4982,7 @@ done:
 /* Return true if both symbols could refer to the same data object.  Does
    not take account of aliasing due to equivalence statements.  */
 
-static int
+static bool
 symbols_could_alias (gfc_symbol *lsym, gfc_symbol *rsym, bool lsym_pointer,
 		     bool lsym_target, bool rsym_pointer, bool rsym_target)
 {
@@ -8588,7 +8588,7 @@ gfc_conv_array_parameter (gfc_se * se, gfc_expr * expr, bool g77,
 			 "Creating array temporary at %L", &expr->where);
 	}
 
-      /* When optmizing, we can use gfc_conv_subref_array_arg for
+      /* When optimizing, we can use gfc_conv_subref_array_arg for
 	 making the packing and unpacking operation visible to the
 	 optimizers.  */
 
@@ -11193,7 +11193,7 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
 }
 
 
-/* Initialize class descriptor's TKR infomation.  */
+/* Initialize class descriptor's TKR information.  */
 
 void
 gfc_trans_class_array (gfc_symbol * sym, gfc_wrapped_block * block)
@@ -11471,6 +11471,12 @@ gfc_walk_array_ref (gfc_ss * ss, gfc_expr * expr, gfc_ref * ref)
 	  break;
 
 	case AR_FULL:
+	  /* Assumed shape arrays from interface mapping need this fix.  */
+	  if (!ar->as && expr->symtree->n.sym->as)
+	    {
+	      ar->as = gfc_get_array_spec();
+	      *ar->as = *expr->symtree->n.sym->as;
+	    }
 	  newss = gfc_get_array_ss (ss, expr, ar->as->rank, GFC_SS_SECTION);
 	  newss->info->data.array.ref = ref;
 

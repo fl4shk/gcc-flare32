@@ -3312,6 +3312,16 @@ gfc_compare_actual_formal (gfc_actual_arglist **ap, gfc_formal_arglist *formal,
 	    }
 	}
 
+      if (UNLIMITED_POLY (a->expr)
+	  && !(f->sym->ts.type == BT_ASSUMED || UNLIMITED_POLY (f->sym)))
+	{
+	  gfc_error ("Unlimited polymorphic actual argument at %L is not "
+		     "matched with either an unlimited polymorphic or "
+		     "assumed type dummy argument", &a->expr->where);
+	  ok = false;
+	  goto match;
+	}
+
       /* Special case for character arguments.  For allocatable, pointer
 	 and assumed-shape dummies, the string length needs to match
 	 exactly.  */
@@ -3633,6 +3643,18 @@ gfc_compare_actual_formal (gfc_actual_arglist **ap, gfc_formal_arglist *formal,
 	{
 	  if (where)
 	    gfc_error ("Actual argument for %qs must be ALLOCATABLE at %L",
+		       f->sym->name, &a->expr->where);
+	  ok = false;
+	  goto match;
+	}
+
+      if (a->expr->expr_type == EXPR_FUNCTION
+	  && a->expr->value.function.esym
+	  && f->sym->attr.allocatable)
+	{
+	  if (where)
+	    gfc_error ("Actual argument for %qs at %L is a function result "
+		       "and the dummy argument is ALLOCATABLE",
 		       f->sym->name, &a->expr->where);
 	  ok = false;
 	  goto match;
