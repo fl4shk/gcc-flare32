@@ -116,6 +116,8 @@ csky*-*-*)
 fido-*-*)
 	cpu_type=m68k
 	;;
+flare32*)	cpu_type=flare32
+	;;
 frv*)	cpu_type=frv
 	;;
 ft32*)	cpu_type=ft32
@@ -604,6 +606,10 @@ csky-*-linux*)
 epiphany-*-elf* | epiphany-*-rtems*)
 	tmake_file="$tmake_file epiphany/t-epiphany t-fdpbit epiphany/t-custom-eqsf"
 	extra_parts="$extra_parts crti.o crtint.o crtrunc.o crtm1reg-r43.o crtm1reg-r63.o crtn.o"
+	;;
+flare32-*-elf)
+	tmake_file="$tmake_file flare32/t-flare32 t-softfp-sfdf t-softfp-excl t-softfp"
+	extra_parts="$extra_parts crti.o crtn.o crtbegin.o crtend.o"
 	;;
 fr30-*-elf)
 	tmake_file="$tmake_file fr30/t-fr30 t-fdpbit"

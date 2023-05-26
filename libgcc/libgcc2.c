@@ -1977,33 +1977,33 @@ CONCAT3(__mul,MODE,3) (MTYPE a, MTYPE b, MTYPE c, MTYPE d)
 	{
 	  /* z is infinite.  "Box" the infinity and change NaNs in
 	     the other factor to 0.  */
-	  a = COPYSIGN (isinf (a) ? 1 : 0, a);
-	  b = COPYSIGN (isinf (b) ? 1 : 0, b);
+	  //a = COPYSIGN (isinf (a) ? 1 : 0, a);
+	  //b = COPYSIGN (isinf (b) ? 1 : 0, b);
 	  if (isnan (c)) c = COPYSIGN (0, c);
 	  if (isnan (d)) d = COPYSIGN (0, d);
           recalc = 1;
 	}
-     if (isinf (c) || isinf (d))
-	{
-	  /* w is infinite.  "Box" the infinity and change NaNs in
-	     the other factor to 0.  */
-	  c = COPYSIGN (isinf (c) ? 1 : 0, c);
-	  d = COPYSIGN (isinf (d) ? 1 : 0, d);
-	  if (isnan (a)) a = COPYSIGN (0, a);
-	  if (isnan (b)) b = COPYSIGN (0, b);
-	  recalc = 1;
-	}
-     if (!recalc
-	  && (isinf (ac) || isinf (bd)
-	      || isinf (ad) || isinf (bc)))
-	{
-	  /* Recover infinities from overflow by changing NaNs to 0.  */
-	  if (isnan (a)) a = COPYSIGN (0, a);
-	  if (isnan (b)) b = COPYSIGN (0, b);
-	  if (isnan (c)) c = COPYSIGN (0, c);
-	  if (isnan (d)) d = COPYSIGN (0, d);
-	  recalc = 1;
-	}
+     //if (isinf (c) || isinf (d))
+     //   {
+     //     /* w is infinite.  "Box" the infinity and change NaNs in
+     //        the other factor to 0.  */
+     //     c = COPYSIGN (isinf (c) ? 1 : 0, c);
+     //     d = COPYSIGN (isinf (d) ? 1 : 0, d);
+     //     if (isnan (a)) a = COPYSIGN (0, a);
+     //     if (isnan (b)) b = COPYSIGN (0, b);
+     //     recalc = 1;
+     //   }
+     //if (!recalc
+     //     && (isinf (ac) || isinf (bd)
+     //         || isinf (ad) || isinf (bc)))
+     //   {
+     //     /* Recover infinities from overflow by changing NaNs to 0.  */
+     //     if (isnan (a)) a = COPYSIGN (0, a);
+     //     if (isnan (b)) b = COPYSIGN (0, b);
+     //     if (isnan (c)) c = COPYSIGN (0, c);
+     //     if (isnan (d)) d = COPYSIGN (0, d);
+     //     recalc = 1;
+     //   }
       if (recalc)
 	{
 	  x = INFINITY * (a * c - b * d);

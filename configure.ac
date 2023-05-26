@@ -1054,6 +1054,10 @@ case "${target}" in
   d30v-*-*)
     noconfigdirs="$noconfigdirs gdb"
     ;;
+  flare32-*-*)
+    #noconfigdirs="$noconfigdirs gdb target-newlib"
+    noconfigdirs="$noconfigdirs gdb"
+    ;;
   fr30-*-elf*)
     noconfigdirs="$noconfigdirs gdb"
     ;;
