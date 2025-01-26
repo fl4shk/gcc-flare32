@@ -1236,6 +1236,7 @@ case $cpu-$vendor in
 			| mmix \
 			| mn10200 | mn10300 \
 			| moxie \
+			| snowhousecpu \
 			| mt \
 			| msp430 \
 			| nds32 | nds32le | nds32be \
@@ -1566,6 +1567,9 @@ case $cpu-$vendor in
 		os=tops20
 		;;
 	pdp11-*)
+		os=none
+		;;
+	snowhousecpu-*)
 		os=none
 		;;
 	*-dec | vax-*)

@@ -1122,6 +1122,9 @@ case "${target}" in
   moxie-*-*)
     noconfigdirs="$noconfigdirs"
     ;;
+  snowhousecpu-*-*)
+    noconfigdirs="$noconfigdirs target-libgloss target-rda gprof target-newlib libgcc"
+    ;;
   h8300*-*-*)
     noconfigdirs="$noconfigdirs target-libgloss"
     ;;
