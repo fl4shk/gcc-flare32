@@ -1626,6 +1626,11 @@ snowhousecpu_get_return_address (int count)
 
   return get_hard_reg_initial_val (Pmode, SNOWHOUSECPU_LR);
 }
+static void
+snowhousecpu_asm_named_section (const char *name, unsigned int flags, tree decl)
+{
+  default_elf_asm_named_section (name, flags, decl);
+}
 
 static bool
 snowhousecpu_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
@@ -1872,6 +1877,8 @@ snowhousecpu_setup_incoming_varargs
 #undef TARGET_HARD_REGNO_MODE_OK 
 #define TARGET_HARD_REGNO_MODE_OK snowhousecpu_hard_regno_mode_ok
 
+#undef TARGET_ASM_NAMED_SECTION 
+#define TARGET_ASM_NAMED_SECTION snowhousecpu_asm_named_section
 
 //#undef TARGET_RTX_COSTS
 //#define TARGET_RTX_COSTS snowhousecpu_target_rtx_costs

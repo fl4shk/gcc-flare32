@@ -434,6 +434,8 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 #define CTORS_SECTION_ASM_OP "\t.section\t.init_array,\"aw\",%init_array"
 #define DTORS_SECTION_ASM_OP "\t.section\t.fini_array,\"aw\",%fini_array"
 
+#define HAS_INIT_SECTION
+
 #undef INIT_SECTION_ASM_OP
 #undef FINI_SECTION_ASM_OP
 #define INIT_ARRAY_SECTION_ASM_OP CTORS_SECTION_ASM_OP
