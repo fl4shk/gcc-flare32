@@ -1570,7 +1570,7 @@ case $cpu-$vendor in
 		os=none
 		;;
 	snowhousecpu-*)
-		os=none
+		os=elf
 		;;
 	*-dec | vax-*)
 		os=ultrix4.2

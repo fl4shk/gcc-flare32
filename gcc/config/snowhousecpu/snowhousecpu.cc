@@ -666,6 +666,45 @@ snowhousecpu_print_operand (FILE *file, rtx x, int code)
       // Higher of a register pair, print normal
       rgoff = 0;
       break;
+    case 'C':
+    {
+      const enum rtx_code cond_code = GET_CODE (operand);
+      switch (cond_code)
+      {
+	case EQ:
+	  fprintf (file, "eq");
+	  return;
+	case NE:
+	  fprintf (file, "ne");
+	  return;
+	case GEU:
+	  fprintf (file, "geu");
+	  return;
+	case LTU:
+	  fprintf (file, "ltu");
+	  return;
+	case GTU:
+	  fprintf (file, "gtu");
+	  return;
+	case LEU:
+	  fprintf (file, "leu");
+	  return;
+	case GE:
+	  fprintf (file, "ge");
+	  return;
+	case LT:
+	  fprintf (file, "lt");
+	  return;
+	case GT:
+	  fprintf (file, "gt");
+	  return;
+	case LE:
+	  fprintf (file, "le");
+	  return;
+	default:
+	  LOSE_AND_RETURN ("invalid condition code", x);
+      }
+    }
 
     default:
       //fprintf (stderr, "snowhousecpu_print_operand (): dbg 0\n");
@@ -740,34 +779,57 @@ snowhousecpu_print_operand (FILE *file, rtx x, int code)
   // "operand", and then do a break to let default handling
   // (zero-modifier) output the operand.
 }
-static void
-snowhousecpu_print_addr_const (FILE* file, rtx x)
-{
-  switch (GET_CODE (x))
-  {
-    case LABEL_REF:
-      //output_addr_const (file, x);
-      //break;
-    case SYMBOL_REF:
-      fprintf (file, "\"");
-      output_addr_const (file, x);
-      fprintf (file, "\"");
-      break;
-    case CONST:
-    case CONST_INT:
-      //fprintf (file, "<some_symbol_ref>");
-
-      //fprintf (file, "\"");
-      output_addr_const (file, x);
-      //fprintf (file, "\"");
-      break;
-  }
-}
+//static void
+//snowhousecpu_print_addr_const (FILE* file, rtx x)
+//{
+//  switch (GET_CODE (x))
+//  {
+//    case LABEL_REF:
+//      //output_addr_const (file, x);
+//      //break;
+//    case SYMBOL_REF:
+//      fprintf (file, "\"");
+//      output_addr_const (file, x);
+//      fprintf (file, "\"");
+//      break;
+//    case CONST:
+//    case CONST_INT:
+//      //fprintf (file, "<some_symbol_ref>");
+//
+//      //fprintf (file, "\"");
+//      output_addr_const (file, x);
+//      //fprintf (file, "\"");
+//      break;
+//  }
+//}
 
 static void
 snowhousecpu_print_operand_address (FILE* file,
   machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
+  auto snowhousecpu_print_addr_const = [](FILE* file, rtx x) -> void {
+    switch (GET_CODE (x))
+    {
+      case LABEL_REF:
+	//output_addr_const (file, x);
+	//break;
+      case SYMBOL_REF:
+	//fprintf (file, "\"");
+	output_addr_const (file, x);
+	//fprintf (file, "\"");
+	break;
+      case CONST:
+      //case CONST_INT:
+	//fprintf (file, "<some_symbol_ref>");
+
+	//fprintf (file, "\"");
+	output_addr_const (file, x);
+	//fprintf (file, "\"");
+	break;
+      default:
+	gcc_unreachable ();
+    }
+  };
   rtx left, right;
   switch (GET_CODE (x))
   {
@@ -780,6 +842,7 @@ snowhousecpu_print_operand_address (FILE* file,
     right = XEXP (x, 1);
     if (GET_CODE (left) == REG)
     {
+      fprintf (file, "%s, ", reg_names[REGNO (left)]);
       if (GET_CODE (right) == CONST_INT)
       {
 	fprintf (file, "%ld", INTVAL (right));
@@ -819,13 +882,15 @@ snowhousecpu_print_operand_address (FILE* file,
   //  fprintf (file, "\"");
   //  break;
   case CONST:
+    snowhousecpu_print_addr_const (file, x);
+    break;
   case CONST_INT:
   //  //fprintf (file, "<some_symbol_ref>");
 
   //  //fprintf (file, "\"");
   //  output_addr_const (file, x);
   //  //fprintf (file, "\"");
-    snowhousecpu_print_addr_const (file, x);
+    fprintf (file, "%ld", INTVAL (x));
     break;
 
   //case CONST:
@@ -1201,99 +1266,6 @@ snowhousecpu_regno_actually_callee_saved (int regno)
   }
   return false;
 }
-
-static void
-snowhousecpu_push (int regno, bool frame_related_p)
-{
-  //rtx insn, movsi_push, rtx_reg;
-
-  //rtx_reg = gen_rtx_REG (SImode, regno);
-  //movsi_push = gen_movsi_push (rtx_reg);
-  //insn = emit_insn (movsi_push);
-
-  //// Attach a note indicating what happened.
-  //add_reg_note (insn, REG_FRAME_, copy_rtx (rtx_reg));
-  //add_reg_note (insn, REG_FRAME_RELATED_EXPR, copy_rtx (movsi_push));
-
-  //RTX_FRAME_RELATED_P (insn) = 1;
-
-  // Idea borrowed from the AVR's `emit_push_byte ()`.
-  rtx sub, mem, reg;
-  rtx_insn* str_insn;
-  rtx_insn* sub_insn;
-
-  //mem = gen_rtx_POST_DEC (SImode, stack_pointer_rtx);
-  //mem = gen_frame_mem (SImode, mem);
-  sub = gen_rtx_MINUS (SImode, stack_pointer_rtx, GEN_INT (UNITS_PER_WORD));
-  //mem = gen_frame_mem (SImode, mem);
-  sub_insn = emit_insn (gen_rtx_SET (stack_pointer_rtx, sub));
-
-  //insn = emit_insn (gen_rtx_SET (mem, reg));
-
-  if (frame_related_p)
-  {
-    RTX_FRAME_RELATED_P (sub_insn) = 1;
-  }
-
-  mem = gen_frame_mem (SImode, stack_pointer_rtx);
-  reg = gen_rtx_REG (SImode, regno);
-  str_insn = emit_insn (gen_rtx_SET (mem, reg));
-
-  if (frame_related_p)
-  {
-    RTX_FRAME_RELATED_P (str_insn) = 1;
-  }
-
-  //return insn;
-}
-static void//rtx
-snowhousecpu_pop (int regno)
-{
-  //rtx insn, movsi_pop, rtx_reg;
-
-  //rtx_reg = gen_rtx_REG (SImode, regno);
-
-  //movsi_pop = gen_movsi_pop (rtx_reg);
-
-  //insn = emit_insn (movsi_pop);
-
-  // Attach a note indicating what happened.
-  //add_reg_note (insn, REG_CFA_RESTORE, copy_rtx (rtx_reg));
-
-  //RTX_FRAME_RELATED_P (insn) = 1;
-
-  // idea borrowed from AVR's `emit_pop_byte ()`.
-  // Hopefully this will just work.
-  //rtx insn, mem, reg;
-
-  //mem = gen_rtx_PRE_INC (SImode, stack_pointer_rtx);
-  //mem = gen_frame_mem (SImode, mem);
-  //reg = gen_rtx_REG (SImode, regno);
-
-  //insn = emit_insn (gen_rtx_SET (reg, mem));
-  rtx add, mem, reg;
-  rtx_insn* ldr_insn;
-  rtx_insn* add_insn;
-
-  mem = gen_frame_mem (SImode, stack_pointer_rtx);
-  reg = gen_rtx_REG (SImode, regno);
-  ldr_insn = emit_insn (gen_rtx_SET (reg, mem));
-
-  //if (frame_related_p)
-  //{
-  //  RTX_FRAME_RELATED_P (ldr_insn) = 1;
-  //}
-
-  add = gen_rtx_PLUS (SImode, stack_pointer_rtx, GEN_INT (UNITS_PER_WORD));
-  add_insn = emit_insn (gen_rtx_SET (stack_pointer_rtx, add));
-
-  //if (frame_related_p)
-  //{
-  //  RTX_FRAME_RELATED_P (add_insn) = 1;
-  //}
-
-  //return insn;
-}
 // Emit RTL equivalent of ADD3 with the given const_int for
 // frame-related registers.
 //   op0          - Destination register.
@@ -1341,6 +1313,101 @@ snowhousecpu_add_to_sp (int addendum, const enum reg_note kind)
 {
   return snowhousecpu_add3_frame_adjust
     (stack_pointer_rtx, stack_pointer_rtx, addendum, kind);
+}
+
+static void
+snowhousecpu_push (int regno, bool frame_related_p)
+{
+  //rtx insn, movsi_push, rtx_reg;
+
+  //rtx_reg = gen_rtx_REG (SImode, regno);
+  //movsi_push = gen_movsi_push (rtx_reg);
+  //insn = emit_insn (movsi_push);
+
+  //// Attach a note indicating what happened.
+  //add_reg_note (insn, REG_FRAME_, copy_rtx (rtx_reg));
+  //add_reg_note (insn, REG_FRAME_RELATED_EXPR, copy_rtx (movsi_push));
+
+  //RTX_FRAME_RELATED_P (insn) = 1;
+
+  // Idea borrowed from the AVR's `emit_push_byte ()`.
+  rtx /*sub,*/ mem, reg;
+  rtx_insn* str_insn;
+  //rtx_insn* sub_insn;
+
+  ////mem = gen_rtx_POST_DEC (SImode, stack_pointer_rtx);
+  ////mem = gen_frame_mem (SImode, mem);
+  //sub = gen_rtx_MINUS (SImode, stack_pointer_rtx, GEN_INT (UNITS_PER_WORD));
+  ////mem = gen_frame_mem (SImode, mem);
+  //sub_insn = emit_insn (gen_rtx_SET (stack_pointer_rtx, sub));
+
+  ////insn = emit_insn (gen_rtx_SET (mem, reg));
+
+  //if (frame_related_p)
+  //{
+  //  RTX_FRAME_RELATED_P (sub_insn) = 1;
+  //}
+  snowhousecpu_add_to_sp (-UNITS_PER_WORD, REG_NOTE_MAX);
+
+  mem = gen_frame_mem (SImode, stack_pointer_rtx);
+  reg = gen_rtx_REG (SImode, regno);
+  str_insn = emit_insn (gen_rtx_SET (mem, reg));
+
+  if (frame_related_p)
+  {
+    RTX_FRAME_RELATED_P (str_insn) = 1;
+  }
+
+  //return insn;
+}
+static void//rtx
+snowhousecpu_pop (int regno)
+{
+  //rtx insn, movsi_pop, rtx_reg;
+
+  //rtx_reg = gen_rtx_REG (SImode, regno);
+
+  //movsi_pop = gen_movsi_pop (rtx_reg);
+
+  //insn = emit_insn (movsi_pop);
+
+  // Attach a note indicating what happened.
+  //add_reg_note (insn, REG_CFA_RESTORE, copy_rtx (rtx_reg));
+
+  //RTX_FRAME_RELATED_P (insn) = 1;
+
+  // idea borrowed from AVR's `emit_pop_byte ()`.
+  // Hopefully this will just work.
+  //rtx insn, mem, reg;
+
+  //mem = gen_rtx_PRE_INC (SImode, stack_pointer_rtx);
+  //mem = gen_frame_mem (SImode, mem);
+  //reg = gen_rtx_REG (SImode, regno);
+
+  //insn = emit_insn (gen_rtx_SET (reg, mem));
+  rtx /*add,*/ mem, reg;
+  rtx_insn* ldr_insn;
+  //rtx_insn* add_insn;
+
+  mem = gen_frame_mem (SImode, stack_pointer_rtx);
+  reg = gen_rtx_REG (SImode, regno);
+  ldr_insn = emit_insn (gen_rtx_SET (reg, mem));
+
+  //if (frame_related_p)
+  //{
+  //  RTX_FRAME_RELATED_P (ldr_insn) = 1;
+  //}
+
+  //add = gen_rtx_PLUS (SImode, stack_pointer_rtx, GEN_INT (UNITS_PER_WORD));
+  //add_insn = emit_insn (gen_rtx_SET (stack_pointer_rtx, add));
+  snowhousecpu_add_to_sp (UNITS_PER_WORD, REG_NOTE_MAX);
+
+  //if (frame_related_p)
+  //{
+  //  RTX_FRAME_RELATED_P (add_insn) = 1;
+  //}
+
+  //return insn;
 }
 
 void
@@ -1531,6 +1598,7 @@ snowhousecpu_emit_mov (rtx dst, rtx src, machine_mode mode)
   //if (GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
   {
     emit_insn (gen_rtx_SET (operands[0], operands[1]));
+    //emit_move_insn (operands[0], operands[1]);
   }
   //else if (GET_MODE_SIZE (mode) == UNITS_PER_WORD * 2)
   //{

@@ -31,7 +31,7 @@
 (define_insn "nop"
   [(const_int 0)]
   "true"
-  "cpy(r0, r0),    // nop")
+  "cpy r0, r0    // nop")
 
 ;; -----------------------
 ;; Arithmetic Instructions
@@ -43,8 +43,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  add(%0, %1, %2),  // addsi3: =r, r, r
-  add(%0, %1, %2),  // addsi3: =r, r, i"
+  add %0, %1, %2  // addsi3: =r, r, r
+  add %0, %1, %2  // addsi3: =r, r, i"
 )
 (define_insn "subsi3"
   [(set (match_operand:SI 0 "register_operand" "=r,r")
@@ -53,8 +53,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  sub(%0, %1, %2),  // subsi3: =r, r, r
-  sub(%0, %1, %2),  // subsi3: =r, r, i"
+  sub %0, %1, %2  // subsi3: =r, r, r
+  sub %0, %1, %2  // subsi3: =r, r, i"
 )
 
 
@@ -64,7 +64,7 @@
       (match_operand:SI 1 "register_operand" "r")
       (match_operand:SI 2 "register_operand" "r")))]
   ""
-  "mul(%0, %1, %2),"
+  "mul %0, %1, %2"
 )
 ;; --------
 ;; TODO: come back to this when more multiply/divide instructions exist in SnowHouseCpu
@@ -127,7 +127,7 @@
       (match_operand:SI 1 "register_operand" "r")
       (match_operand:SI 2 "register_operand" "r")))]
   ""
-  "udiv(%0, %1, %2),")
+  "udiv %0, %1, %2")
 
 (define_insn "divsi3"
   [(set (match_operand:SI 0 "register_operand" "=r")
@@ -135,7 +135,7 @@
       (match_operand:SI 1 "register_operand" "r")
       (match_operand:SI 2 "register_operand" "r")))]
   ""
-  "sdiv(%0, %1, %2),")
+  "sdiv %0, %1, %2")
 
 (define_insn "umodsi3"
   [(set (match_operand:SI 0 "register_operand" "=r")
@@ -143,7 +143,7 @@
       (match_operand:SI 1 "register_operand" "r")
       (match_operand:SI 2 "register_operand" "r")))]
   ""
-  "umod(%0, %1, %2),")
+  "umod %0, %1, %2")
 
 (define_insn "modsi3"
   [(set (match_operand:SI 0 "register_operand" "=r")
@@ -151,7 +151,7 @@
       (match_operand:SI 1 "register_operand" "r")
       (match_operand:SI 2 "register_operand" "r")))]
   ""
-  "smod(%0, %1, %2),")
+  "smod %0, %1, %2")
 
 ;; --------
 ;;(define_expand "udivdi3"
@@ -256,8 +256,8 @@
   (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  lsl(%0, %1, %2),
-  lsl(%0, %1, %2),"
+  lsl %0, %1, %2
+  lsl %0, %1, %2"
 )
 
 (define_insn "lshrsi3"
@@ -266,8 +266,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  lsr(%0, %1, %2),
-  lsr(%0, %1, %2),"
+  lsr %0, %1, %2
+  lsr %0, %1, %2"
 )
 ;;(define_insn "lshrhi3"
 ;;  [(set (match_operand:HI 0 "register_operand" "=r")
@@ -288,8 +288,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  asr(%0, %1, %2),
-  asr(%0, %1, %2),"
+  asr %0, %1, %2
+  asr %0, %1, %2"
 )
 ;;(define_insn "ashrhi3"
 ;;  [(set (match_operand:HI 0 "register_operand" "=r")
@@ -310,8 +310,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  and(%0, %1, %2),
-  and(%0, %1, %2),"
+  and %0, %1, %2
+  and %0, %1, %2"
 )
 
 (define_insn "iorsi3"
@@ -320,8 +320,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  or(%0, %1, %2),
-  or(%0, %1, %2),"
+  or %0, %1, %2
+  or %0, %1, %2"
 )
 
 (define_insn "xorsi3"
@@ -330,8 +330,8 @@
       (match_operand:SI 2 "general_operand" "r,i")))]
   ""
   "@
-  xor(%0, %1, %2),
-  xor(%0, %1, %2),"
+  xor %0, %1, %2
+  xor %0, %1, %2"
 )
 
 (define_expand "one_cmplsi2"
@@ -378,9 +378,9 @@
 
 
 (define_expand "mov<mode>"
-  [(set (match_operand:MOV32 0 "general_operand" "")
+  [(set (match_operand:MOV32 0 "nonimmediate_operand" "")
     (match_operand:MOV32 1
-      "general_operand"
+      "snowhousecpu_general_mov_src_operand"
       ""))]
   ""
 {
@@ -429,11 +429,11 @@
     || register_operand (operands[1], <MODE>mode)"
   ;;""
   "@
-  cpy(%0, %1),
-  cpy(%0, %1),
-  ldr(%0, %1),
-  str(%1, %0),
-  add(%0, %1, 0x0)"
+  cpy %0, %1        // *mov32: =r, r
+  cpy %0, %1        // *mov32: =r, i
+  ldr %0, %1        // *mov32: =r, B
+  str %1, %0        // *mov32: =B, r
+  add %0, %1, 0x0   // *mov32: =r, d"
 )
 
 
@@ -545,10 +545,10 @@
   || register_operand (operands[1], <MODE>mode)"
   ;;""
   "@
-  cpy(%0, %1),    // *mov16: =r, r
-  cpy(%0, #%1),    // *mov16: =r, i
-  lduh(%0, %1),    // *mov16: =r, B
-  sth(%1, %0),    // *mov16: =B, r"
+  cpy %0, %1    // *mov16: =r, r
+  cpy %0, #%1    // *mov16: =r, i
+  lduh %0, %1    // *mov16: =r, B
+  sth %1, %0    // *mov16: =B, r"
 )
 ;; --------
 (define_expand "mov<mode>"
@@ -578,24 +578,24 @@
   || register_operand (operands[1], <MODE>mode)"
   ;;""
   "@
-  cpy(%0, %1)    // *mov8: =r, r
-  cpy(%0, %1)    // *mov8: =r, i
-  ldub(%0, %1),    // *mov8: =r, B
-  stb(%1, %0),    // *mov8: =B, r"
+  cpy %0, %1    // *mov8: =r, r
+  cpy %0, %1    // *mov8: =r, i
+  ldub %0, %1    // *mov8: =r, B
+  stb %1, %0    // *mov8: =B, r"
 )
 ;; --------
 (define_insn "zero_extendhisi2"
   [(set (match_operand:SI 0 "register_operand" "=r")
     (zero_extend:SI (match_operand:HI 1 "nonimmediate_operand" "B")))]
   ""
-  "lduh(%0, %1),    // zero_extendhisi2"
+  "lduh %0, %1    // zero_extendhisi2"
 )
 
 (define_insn "extendhisi2"
   [(set (match_operand:SI 0 "register_operand" "=r")
     (sign_extend:SI (match_operand:HI 1 "nonimmediate_operand" "B")))]
   ""
-  "ldsh(%0, %1),    // sign_extendhisi2"
+  "ldsh %0, %1    // sign_extendhisi2"
 )
 
 
@@ -603,14 +603,14 @@
   [(set (match_operand:SI 0 "register_operand" "=r")
     (zero_extend:SI (match_operand:QI 1 "nonimmediate_operand" "B")))]
   ""
-  "ldub(%0, %1),    // zero_extendqisi2"
+  "ldub %0, %1    // zero_extendqisi2"
 )
 
 (define_insn "sign_extendqisi2"
   [(set (match_operand:SI 0 "register_operand" "=r")
     (sign_extend:SI (match_operand:QI 1 "nonimmediate_operand" "B")))]
   ""
-  "ldsb(%0, %1),    // sign_extendqisi2"
+  "ldsb %0, %1    // sign_extendqisi2"
 )
 
 ;;(define_insn "cmpdi"
@@ -738,106 +738,161 @@
 ;;  ""
 ;;)
 ;;
-(define_insn "beq"
+(define_expand "cbranchsi4"
   [(set (pc)
     (if_then_else
-      (eq:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
+      (match_operator 0 "comparison_operator"
+        [(match_operand:SI 1 "register_operand")
+        (match_operand:SI 2 "register_operand")])
+      (label_ref (match_operand 3 ""))
       (pc)))]
   ""
-  "beq(%0, %1, %2),")
-(define_insn "bne"
+{
+  const enum rtx_code code = GET_CODE (operands[0]);
+  //operands[1] = force_reg (operands[1]);
+  //operands[2] = force_reg (operands[2]);
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx label3 = operands[3];
+  rtx j;
+  rtx my_cond;
+  if (
+    code == EQ || code == NE
+    || code == GEU || code == LTU || code == GTU || code == LEU
+    || code == GE || code == LT || code == GT || code == LE
+  )
+  {
+    my_cond = gen_rtx_fmt_ee (code, VOIDmode, op1, op2);
+  }
+  else
+  {
+    gcc_unreachable ();
+  }
+  //rtx label3_ref = gen_rtx_LABEL_REF (Pmode, label3);
+  //rtx check = gen_rtx_IF_THEN_ELSE (VOIDmode, my_cond, label3, pc_rtx);
+  //j = emit_jump_insn (gen_rtx_SET (pc_rtx, check));
+  //emit_conditional_branch_insn ();
+  //JUMP_LABEL (j) = label3;
+  //LABEL_NUSES (label3)++;
+  emit_jump_insn (gen_condjump (my_cond, label3));
+  DONE;
+})
+(define_expand "condjump"
+  [(set (pc)
+	(if_then_else (match_operand 0)
+		      (label_ref (match_operand 1))
+		      (pc)))])
+(define_insn "*branch"
   [(set (pc)
     (if_then_else
-      (ne:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
+      (match_operator 1 "ordered_comparison_operator"
+		[(match_operand:SI 2 "register_operand" "r")
+        (match_operand:SI 3 "register_operand" "r")])
+      (label_ref (match_operand 0 ""))
       (pc)))]
   ""
-  "bne(%0, %1, %2),")
-(define_insn "bgeu"
-  [(set (pc)
-    (if_then_else
-      (geu:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bgeu(%0, %1, %2),")
-(define_insn "bltu"
-  [(set (pc)
-    (if_then_else
-      (ltu:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bltu(%0, %1, %2),")
-(define_insn "bgtu"
-  [(set (pc)
-    (if_then_else
-      (gtu:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bgtu(%0, %1, %2),")
-(define_insn "bleu"
-  [(set (pc)
-    (if_then_else
-      (leu:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bleu(%0, %1, %2),")
-(define_insn "bge"
-  [(set (pc)
-    (if_then_else
-      (ge:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bge(%0, %1, %2),")
-(define_insn "blt"
-  [(set (pc)
-    (if_then_else
-      (lt:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "blt(%0, %1, %2),")
-(define_insn "bgt"
-  [(set (pc)
-    (if_then_else
-      (gt:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "bgt(%0, %1, %2),")
-(define_insn "ble"
-  [(set (pc)
-    (if_then_else
-      (le:SI
-        (match_operand:SI 0 "register_operand" "r")
-        (match_operand:SI 1 "register_operand" "r"))
-      (label_ref (match_operand 2 "" ""))
-      (pc)))]
-  ""
-  "ble(%0, %1, %2),")
+  "b%C1 %2, %3, %l0"
+)
+;;(define_insn "beq"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (eq
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "beq %0, %1, %2")
+;;(define_insn "bne"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (ne
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bne %0, %1, %2")
+;;(define_insn "bgeu"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (geu
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bgeu %0, %1, %2")
+;;(define_insn "bltu"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (ltu
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bltu %0, %1, %2")
+;;(define_insn "bgtu"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (gtu
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bgtu %0, %1, %2")
+;;(define_insn "bleu"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (leu
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bleu %0, %1, %2")
+;;(define_insn "bge"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (ge
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bge %0, %1, %2")
+;;(define_insn "blt"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (lt
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "blt %0, %1, %2")
+;;(define_insn "bgt"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (gt
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "bgt %0, %1, %2")
+;;(define_insn "ble"
+;;  [(set (pc)
+;;    (if_then_else
+;;      (le
+;;        (match_operand:SI 0 "register_operand" "r")
+;;        (match_operand:SI 1 "register_operand" "r"))
+;;      (label_ref (match_operand 2 ""))
+;;      (pc)))]
+;;  ""
+;;  "ble %0, %1, %2")
 
 ;;(define_insn "mybranch<cond:code>"
 ;;  [(set (pc)
@@ -884,12 +939,12 @@
 (define_insn "indirect_jump"
   [(set (pc) (match_operand:SI 0 "register_operand" "r"))]
   ""
-  "jmp(%0),")
+  "jmp %0")
 
 (define_insn "jump"
   [(set (pc) (label_ref (match_operand 0)))]
   ""
-  "bz(r0, %l0),")
+  "bz r0, %l0")
 
 
 ;;(define_expand "call"
@@ -919,8 +974,8 @@
     (clobber (reg:SI REG_LR))]
   ""
   "@
-  bl(%0),    // *call: i
-  jl(%0),    // *call: r")
+  bl %0    // *call: i
+  jl %0    // *call: r")
 
 
 (define_expand "call_value"
@@ -987,8 +1042,8 @@
     (clobber (reg:SI REG_LR))]
   ""
   "@
-  bl(%1),    // *call_value: =r, i
-  jl(%1),    // *call_value: =r, r"
+  bl %1    // *call_value: =r, i
+  jl %1    // *call_value: =r, r"
 )
 
 ;;(define_insn "*call_value_indirect"
@@ -1038,7 +1093,7 @@
   "returner"
   [(return)]
   "reload_completed"
-  "jmp(lr),")
+  "jmp lr")
 ;;(define_insn
 ;;  "return"
 ;;  [(return)]

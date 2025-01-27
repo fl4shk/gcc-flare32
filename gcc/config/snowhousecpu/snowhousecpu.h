@@ -419,29 +419,62 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 
 
 // Switch to the text or data segment.
-#define TEXT_SECTION_ASM_OP  "//"  //"\t.text"
-#define DATA_SECTION_ASM_OP  "//"  //"\t.data"
+//#define TEXT_SECTION_ASM_OP  "\t.text"
+//#define DATA_SECTION_ASM_OP  "\t.data"
+
+/* Output before read-only data.  */
+#define TEXT_SECTION_ASM_OP "\t.section\t.text"
+
+/* Output before writable data.  */
+#define DATA_SECTION_ASM_OP "\t.section\t.data"
+
+/* Output before uninitialized data.  */
+#define BSS_SECTION_ASM_OP "\t.section\t.bss"
+
+#define CTORS_SECTION_ASM_OP "\t.section\t.init_array,\"aw\",%init_array"
+#define DTORS_SECTION_ASM_OP "\t.section\t.fini_array,\"aw\",%fini_array"
+
+#undef INIT_SECTION_ASM_OP
+#undef FINI_SECTION_ASM_OP
+#define INIT_ARRAY_SECTION_ASM_OP CTORS_SECTION_ASM_OP
+#define FINI_ARRAY_SECTION_ASM_OP DTORS_SECTION_ASM_OP
+
+/* Since we use .init_array/.fini_array we don't need the markers at
+   the start and end of the ctors/dtors arrays.  */
+#define CTOR_LIST_BEGIN asm (CTORS_SECTION_ASM_OP)
+#define CTOR_LIST_END		/* empty */
+#define DTOR_LIST_BEGIN asm (DTORS_SECTION_ASM_OP)
+#define DTOR_LIST_END		/* empty */
 
 // Assembler Commands for Alignment
 
-#define ASM_OUTPUT_ALIGN(STREAM,POWER) \
-  fprintf (STREAM, "//align\n");
+/* This is how to output an assembler line
+   that says to advance the location counter
+   to a multiple of 2**LOG bytes.  */
+
+#define ASM_OUTPUT_ALIGN(FILE,LOG)	\
+  if ((LOG) != 0)			\
+    fprintf (FILE, "\t.align %d\n", (1 << (LOG)))
 
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
-  fprintf (FILE, "//skip\n")
+  fprintf (FILE, "\t.skip " HOST_WIDE_INT_PRINT_UNSIGNED"\n", (SIZE))
 
-// This says how to output an assembler line
-// to define a global common symbol.
+/* This says how to output an assembler line
+   to define a global common symbol.  */
 
 #define ASM_OUTPUT_COMMON(FILE, NAME, SIZE, ROUNDED)  \
-  fprintf (FILE, "//global\n")
-
+( fputs ("\t.common ", (FILE)),		\
+  assemble_name ((FILE), (NAME)),		\
+  fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\"\n", (SIZE)))
 
 /* This says how to output an assembler line to define a local common
    symbol.  */
 
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGNED)		\
-  fprintf (FILE, "//aligned local\n")
+( fputs ("\t.reserve ", (FILE)),					\
+  assemble_name ((FILE), (NAME)),					\
+  fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\",%u\n",	\
+	   (SIZE), ((ALIGNED) / BITS_PER_UNIT)))
 
 /* A C statement (sans semicolon) to output to the stdio stream
    FILE the assembler definition of uninitialized global DECL named
@@ -453,6 +486,11 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
     ASM_OUTPUT_ALIGNED_LOCAL (FILE, NAME, SIZE, ALIGN);		\
   } while (0)
 
+/* Output #ident as a .ident.  */
+
+#undef TARGET_ASM_OUTPUT_IDENT
+#define TARGET_ASM_OUTPUT_IDENT default_asm_output_ident_directive
+
 
 
 //#define ASM_OUTPUT_ALIGN(STREAM,POWER)
@@ -460,9 +498,10 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 
 // Output and Generation of Labels
 
-#define GLOBAL_ASM_OP "//.global"
+#define GLOBAL_ASM_OP ".global "
 
 
+#define INIT_SECTION_ASM_OP ".section .init"
 
 
 // Passing Function Arguments
@@ -843,7 +882,7 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 #define STACK_BOUNDARY 32
 
 // Alignment required for a function entry point, in bits.
-#define FUNCTION_BOUNDARY 32//16
+#define FUNCTION_BOUNDARY 32
 
 // Biggest alignment that any data type can require on this machine, in
 // bits.  Note that this is not the biggest alignment that is supported,

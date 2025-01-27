@@ -1850,7 +1850,9 @@ moxie-*-moxiebox*)
 	tm_file="${tm_file} elfos.h moxie/moxiebox.h newlib-stdint.h"
 	tmake_file="${tmake_file} moxie/t-moxiebox"
 	;;
-snowhousecpu-*-none)
+snowhousecpu-*-elf)
+	gas=yes
+	gnu_ld=yes
 	tm_file="${tm_file} newlib-stdint.h"
 	tmake_file="${tmake_file} snowhousecpu/t-snowhousecpu"
 	;;
