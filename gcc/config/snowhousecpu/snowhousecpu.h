@@ -248,7 +248,7 @@
 #define CALL_REALLY_USED_REGISTERS \
   { \
     /*1, */ /* r0 */ \
-    1, 1, 1,   /* r1, r2, r3 */ \
+    1, 1, 1,      /* r1, r2, r3 */ \
     1, 1, 1, 0,   /* r4, r5, r6, r7 */ \
     0, 0, 0, 0,   /* r8, r9, r10, r11 */ \
     0, 1, 1, 1,   /* r12, lr, fp, sp */ \
@@ -256,6 +256,18 @@
     /*1,*/            /* fake_flags */ \
     1,            /* pc */ \
   }
+
+//#define REG_ALLOC_ORDER
+// {
+//   0, 1, 2,	    /* r1, r2, r3 */
+//   3, 4, 5, 6,	    /* r4, r5, r6, r7 */
+//   7, 8, 9, 10,	    /* r8, r9, r10, r11 */
+//   11, 12, 13, 14,  /* r12, lr, fp, sp */
+//   15, 16,	    /* fake_fp, fake_ap */
+//   17,		    /* pc */
+// }
+
+//#define HONOR_REG_ALLOC_ORDER 1
 
 enum reg_class
 {
@@ -361,7 +373,10 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 // A C expression whose value is a register class containing hard register
 // REGNO.
 #define REGNO_REG_CLASS(R) \
-  ((R < FIRST_PSEUDO_REGISTER) ? snowhousecpu_regno_to_class[R] : SPECIAL_REGS)
+  ((R < FIRST_PSEUDO_REGISTER) ? snowhousecpu_regno_to_class[R] : NO_REGS)
+
+//#define IRA_HARD_REGNO_ADD_COST_MULTIPLIER(jegno)
+//  ((regno) <= SNOWHOUSECPU_LAST_ARG_REGNUM ? 0.0 : 0.65)
 
 
 // Force GCC to accept that SNOWHOUSECPU_LR is to be restored during the

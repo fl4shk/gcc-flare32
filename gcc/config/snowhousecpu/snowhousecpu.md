@@ -336,11 +336,11 @@
 
 (define_expand "one_cmplsi2"
   [(set (match_operand:SI 0 "register_operand" "=r")
-    (not:SI (match_operand:SI 1 "register_operand" "0")))]
+    (not:SI (match_operand:SI 1 "register_operand" "r")))]
   ""
 {
   auto tmp_const = GEN_INT (-1);
-  emit_insn (gen_xorsi3 (operands[0], operands[0], tmp_const));
+  emit_insn (gen_xorsi3 (operands[0], operands[1], tmp_const));
   DONE;
 })
 
@@ -944,7 +944,7 @@
 (define_insn "jump"
   [(set (pc) (label_ref (match_operand 0)))]
   ""
-  "bz r0, %l0")
+  "beq r0, r0, %l0")
 
 
 ;;(define_expand "call"
