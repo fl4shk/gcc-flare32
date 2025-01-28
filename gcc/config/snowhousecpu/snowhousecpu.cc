@@ -1347,7 +1347,10 @@ snowhousecpu_push (int regno, bool frame_related_p)
   //{
   //  RTX_FRAME_RELATED_P (sub_insn) = 1;
   //}
+
+  //--------
   snowhousecpu_add_to_sp (-UNITS_PER_WORD, REG_NOTE_MAX);
+  //--------
 
   mem = gen_frame_mem (SImode, stack_pointer_rtx);
   reg = gen_rtx_REG (SImode, regno);
@@ -1360,8 +1363,37 @@ snowhousecpu_push (int regno, bool frame_related_p)
 
   //return insn;
 }
+static void
+snowhousecpu_partial_push (int regno, int idx, bool frame_related_p)
+{
+  rtx plus, mem, reg;
+  rtx_insn* str_insn;
+  plus = gen_rtx_PLUS (SImode, stack_pointer_rtx, GEN_INT (-(idx * UNITS_PER_WORD)));
+  mem = gen_frame_mem (SImode, plus);
+  reg = gen_rtx_REG (SImode, regno);
+  str_insn = emit_insn (gen_rtx_SET (mem, reg));
+  if (frame_related_p)
+  {
+    RTX_FRAME_RELATED_P (str_insn) = 1;
+  }
+}
+static void
+snowhousecpu_partial_pop (int regno, int idx/*, bool frame_related_p*/)
+{
+  rtx plus, mem, reg;
+  rtx_insn* ldr_insn;
+  plus = gen_rtx_PLUS (SImode, stack_pointer_rtx, GEN_INT (idx * UNITS_PER_WORD));
+  mem = gen_frame_mem (SImode, plus);
+  reg = gen_rtx_REG (SImode, regno);
+  ldr_insn = emit_insn (gen_rtx_SET (reg, mem));
+  //if (frame_related_p)
+  //{
+  //  RTX_FRAME_RELATED_P (ldr_insn) = 1;
+  //}
+}
+
 static void//rtx
-snowhousecpu_pop (int regno)
+snowhousecpu_pop (int regno, int idx, bool finish=false)
 {
   //rtx insn, movsi_pop, rtx_reg;
 
@@ -1384,23 +1416,32 @@ snowhousecpu_pop (int regno)
   //mem = gen_frame_mem (SImode, mem);
   //reg = gen_rtx_REG (SImode, regno);
 
-  //insn = emit_insn (gen_rtx_SET (reg, mem));
-  rtx /*add,*/ mem, reg;
-  rtx_insn* ldr_insn;
-  //rtx_insn* add_insn;
+  //--------
+  ////insn = emit_insn (gen_rtx_SET (reg, mem));
+  //rtx /*add,*/ mem, reg;
+  //rtx_insn* ldr_insn;
+  ////rtx_insn* add_insn;
 
-  mem = gen_frame_mem (SImode, stack_pointer_rtx);
-  reg = gen_rtx_REG (SImode, regno);
-  ldr_insn = emit_insn (gen_rtx_SET (reg, mem));
+  //mem = gen_frame_mem (SImode, stack_pointer_rtx);
+  //reg = gen_rtx_REG (SImode, regno);
+  //ldr_insn = emit_insn (gen_rtx_SET (reg, mem));
 
-  //if (frame_related_p)
-  //{
-  //  RTX_FRAME_RELATED_P (ldr_insn) = 1;
-  //}
+  ////if (frame_related_p)
+  ////{
+  ////  RTX_FRAME_RELATED_P (ldr_insn) = 1;
+  ////}
+  //--------
 
   //add = gen_rtx_PLUS (SImode, stack_pointer_rtx, GEN_INT (UNITS_PER_WORD));
   //add_insn = emit_insn (gen_rtx_SET (stack_pointer_rtx, add));
-  snowhousecpu_add_to_sp (UNITS_PER_WORD, REG_NOTE_MAX);
+  if (!finish)
+  {
+    snowhousecpu_partial_pop (regno, idx);
+  }
+  else
+  {
+    snowhousecpu_add_to_sp ((UNITS_PER_WORD * idx), REG_NOTE_MAX);
+  }
 
   //if (frame_related_p)
   //{
@@ -1436,6 +1477,7 @@ snowhousecpu_expand_prologue ()
   //fprintf (stderr, "\nsnowhousecpu_expand_prologue ()\n");
 
   // Save callee-saved registers
+  int idx = 0;
   for (int regno=0; regno<FIRST_PSEUDO_REGISTER; ++regno)
   {
     if (snowhousecpu_regno_actually_callee_saved (regno))
@@ -1443,15 +1485,29 @@ snowhousecpu_expand_prologue ()
     //if (df_regs_ever_live_p (regno) && !call_used_or_fixed_reg_p (regno))
     {
       //gen_push (regno);
-      snowhousecpu_push (regno, true);
+      snowhousecpu_partial_push (regno, idx, true);
+      ++idx;
     }
   }
 
   // Adjust the stack pointer.
   if (cfun->machine->size_for_adjusting_sp > 0)
   {
-    insn = snowhousecpu_add_to_sp (-cfun->machine->size_for_adjusting_sp,
+    insn = snowhousecpu_add_to_sp (
+      (
+	-(
+	  cfun->machine->size_for_adjusting_sp
+	  + (idx * UNITS_PER_WORD)
+	)
+      ),
       REG_FRAME_RELATED_EXPR);
+  }
+  else
+  {
+    insn = snowhousecpu_add_to_sp (
+      -(idx * UNITS_PER_WORD),
+      REG_FRAME_RELATED_EXPR
+    );
   }
 
   // If we are profiling, make sure no instructions are scheduled before
@@ -1476,6 +1532,7 @@ snowhousecpu_expand_epilogue ()
   //fprintf (stderr, "\nsnowhousecpu_expand_epilogue ()\n");
 
   // Restore callee-saved registers
+  int idx = 0;
   for (int regno=FIRST_PSEUDO_REGISTER-1; regno>=0; --regno)
   {
     if (snowhousecpu_regno_actually_callee_saved (regno))
@@ -1483,7 +1540,8 @@ snowhousecpu_expand_epilogue ()
     //if (df_regs_ever_live_p (regno) && !call_used_or_fixed_reg_p (regno))
     {
       //gen_pop (regno);
-      snowhousecpu_pop (regno);
+      snowhousecpu_pop (regno, idx);
+      ++idx;
     }
   }
 
@@ -1495,8 +1553,10 @@ snowhousecpu_expand_epilogue ()
   {
     //gen_pop (SNOWHOUSECPU_FP);
     //gen_pop (HARD_FRAME_POINTER_REGNUM);
-    snowhousecpu_pop (HARD_FRAME_POINTER_REGNUM);
+    snowhousecpu_pop (HARD_FRAME_POINTER_REGNUM, idx);
+    ++idx;
   }
+  snowhousecpu_pop (0, idx, true);
 
   emit_jump_insn (gen_returner ());
   //emit_jump_insn (gen_return ());

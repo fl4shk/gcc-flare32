@@ -22,9 +22,9 @@
   [
   ;;(REG_R0 0)
   ;;(REG_R1 1)
-  (REG_LR 13)
-  (REG_FP 14)
-  (REG_SP 15)
+  (REG_LR 12)
+  (REG_FP 13)
+  (REG_SP 14)
   ;;(REG_FLAGS 18)
   (REG_PC 17)
   ;;(REG_FAKE_FLAGS 18)
