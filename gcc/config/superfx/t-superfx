@@ -1,0 +1,25 @@
+## floating point emulation libraries
+#
+#FPBIT = fp-bit.c
+#DPBIT = dp-bit.c
+#
+#fp-bit.c: $(srcdir)/config/fp-bit.c
+#	echo '#define FLOAT'				> fp-bit.c
+#	cat $(srcdir)/config/fp-bit.c			>> fp-bit.c
+#
+#dp-bit.c: $(srcdir)/config/fp-bit.c
+#	cat $(srcdir)/config/fp-bit.c > dp-bit.c
+#
+## target-specific files
+#
+#md_file = md
+#
+##MD_FILES = constraints predicates flare32 
+#MD_FILES = flare32 
+#
+## Doing it this way lets the gen* programs report the right line numbers.
+#
+#md : $(MD_FILES:%=$(srcdir)/config/flare32/%.md) $(srcdir)/config/flare32/t-flare32
+#	for md in $(MD_FILES); do \
+#	  echo "(include \"$(srcdir)/config/flare32/$$md.md\")"; \
+#	done > md
