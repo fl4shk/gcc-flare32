@@ -213,9 +213,8 @@ update_size_for_adjusting_sp (struct machine_function* self)
   //  = self->local_vars_size
   //  + self->outgoing_args_size;
   self->size_for_adjusting_sp
-    = //crtl->args.pretend_args_size
-    //+
-    self->local_vars_size
+    = self->stack_args_size //crtl->args.pretend_args_size
+    + self->local_vars_size
     + self->outgoing_args_size;
   //snowhousecpu_debug_fprintf (stderr, "update_size_for_adjusting_sp (): %i\n",
   //  self->size_for_adjusting_sp);
@@ -690,16 +689,16 @@ snowhousecpu_print_operand (FILE *file, rtx x, int code)
 	  fprintf (file, "leu");
 	  return;
 	case GE:
-	  fprintf (file, "ge");
+	  fprintf (file, "ges");
 	  return;
 	case LT:
-	  fprintf (file, "lt");
+	  fprintf (file, "lts");
 	  return;
 	case GT:
-	  fprintf (file, "gt");
+	  fprintf (file, "gts");
 	  return;
 	case LE:
-	  fprintf (file, "le");
+	  fprintf (file, "les");
 	  return;
 	default:
 	  LOSE_AND_RETURN ("invalid condition code", x);
@@ -1463,7 +1462,7 @@ snowhousecpu_expand_prologue ()
     // this is apparently only used for the user of GCC, rather than the
     // developer of GCC
     current_function_static_stack_size
-      = cfun->machine->static_stack_size;
+      = cfun->machine->static_stack_size; /*cfun->machine->size_for_adjusting_sp;*/ 
   }
   // Save callee-saved registers
   int idx = 0;
@@ -1479,6 +1478,10 @@ snowhousecpu_expand_prologue ()
   }
 
   // Adjust the stack pointer.
+  //fprintf (
+  //  stderr,
+  //  "test: %x"
+  //);
   if (cfun->machine->size_for_adjusting_sp > 0)
   {
     insn = snowhousecpu_add_to_sp (
@@ -1763,7 +1766,10 @@ snowhousecpu_setup_incoming_varargs
     rtx slot = gen_rtx_PLUS
       (Pmode,
       gen_rtx_REG (SImode, ARG_POINTER_REGNUM),
-      GEN_INT (UNITS_PER_WORD * regno));
+      GEN_INT (UNITS_PER_WORD * (regno - 1)));
+	//rtx slot = gen_rtx_PLUS (Pmode,
+	//			gen_rtx_REG (SImode, ARG_POINTER_REGNUM),
+	//			GEN_INT (UNITS_PER_WORD * regno /*(3 + (regno-2))*/));
     
     emit_move_insn (gen_rtx_MEM (SImode, slot), reg);
   }
