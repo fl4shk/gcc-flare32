@@ -49,10 +49,10 @@ typedef int __gcc_CMPtype __attribute__ ((mode (__libgcc_cmp_return__)));
 /* Not checked.  */
 #define _FP_TININESS_AFTER_ROUNDING 0
 
-//#define	__LITTLE_ENDIAN	1234
+#define	__LITTLE_ENDIAN	1234
 #define	__BIG_ENDIAN	4321
 
-# define __BYTE_ORDER __BIG_ENDIAN
+# define __BYTE_ORDER __LITTLE_ENDIAN
 
 /* Define ALIASNAME as a strong alias for NAME.  */
 # define strong_alias(name, aliasname) _strong_alias(name, aliasname)

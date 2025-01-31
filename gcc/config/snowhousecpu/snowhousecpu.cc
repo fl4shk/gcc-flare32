@@ -670,38 +670,38 @@ snowhousecpu_print_operand (FILE *file, rtx x, int code)
       const enum rtx_code cond_code = GET_CODE (operand);
       switch (cond_code)
       {
-	case EQ:
-	  fprintf (file, "eq");
-	  return;
-	case NE:
-	  fprintf (file, "ne");
-	  return;
-	case GEU:
-	  fprintf (file, "geu");
-	  return;
-	case LTU:
-	  fprintf (file, "ltu");
-	  return;
-	case GTU:
-	  fprintf (file, "gtu");
-	  return;
-	case LEU:
-	  fprintf (file, "leu");
-	  return;
-	case GE:
-	  fprintf (file, "ges");
-	  return;
-	case LT:
-	  fprintf (file, "lts");
-	  return;
-	case GT:
-	  fprintf (file, "gts");
-	  return;
-	case LE:
-	  fprintf (file, "les");
-	  return;
-	default:
-	  LOSE_AND_RETURN ("invalid condition code", x);
+        case EQ:
+          fprintf (file, "eq");
+          return;
+        case NE:
+          fprintf (file, "ne");
+          return;
+        case GEU:
+          fprintf (file, "geu");
+          return;
+        case LTU:
+          fprintf (file, "ltu");
+          return;
+        case GTU:
+          fprintf (file, "gtu");
+          return;
+        case LEU:
+          fprintf (file, "leu");
+          return;
+        case GE:
+          fprintf (file, "ges");
+          return;
+        case LT:
+          fprintf (file, "lts");
+          return;
+        case GT:
+          fprintf (file, "gts");
+          return;
+        case LE:
+          fprintf (file, "les");
+          return;
+        default:
+          LOSE_AND_RETURN ("invalid condition code", x);
       }
     }
 
@@ -1656,6 +1656,10 @@ snowhousecpu_emit_mov (rtx dst, rtx src, machine_mode mode)
           "don't have inner `MEM_P`/`snowhousecpu_absolute_ex`\n");
       }
     }
+    //if (GET_CODE (operands[1]) == SUBREG)
+    //{
+    //  rtx tmp = simplify_gen_subreg (SImode);
+    //}
   }
 
   snowhousecpu_debug_fprintf (stderr,
@@ -1707,43 +1711,43 @@ snowhousecpu_asm_named_section (const char *name, unsigned int flags, tree decl)
   default_elf_asm_named_section (name, flags, decl);
 }
 
-static bool
-snowhousecpu_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
-{
-  if (GET_MODE_CLASS (mode) == MODE_CC)
-  {
-    //return (regno == SNOWHOUSECPU_FLAGS);
-    return (regno <= SNOWHOUSECPU_LAST_GENERAL_REGNUM);
-  }
-  //if (regno == SNOWHOUSECPU_FLAGS && GET_MODE_CLASS (mode) != MODE_CC)
-  //{
-  //  return false;
-  //}
-
-  if (regno <= SNOWHOUSECPU_LR
-    && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
-  {
-    return true;
-  }
-  if (regno == HARD_FRAME_POINTER_REGNUM || regno == STACK_POINTER_REGNUM
-    || regno == FRAME_POINTER_REGNUM || regno == ARG_POINTER_REGNUM)
-  {
-    return (GET_MODE_SIZE (mode) <= UNITS_PER_WORD);
-  }
-
-  if (regno < SNOWHOUSECPU_LR
-    && GET_MODE_SIZE (mode) > UNITS_PER_WORD)
-  {
-    const unsigned int
-      num_consec_regs = ((GET_MODE_SIZE (mode)) / UNITS_PER_WORD);
-
-    if ((regno % num_consec_regs) == 0)
-    {
-      return true;
-    }
-  }
-  return false;
-}
+//static bool
+//snowhousecpu_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
+//{
+//  if (GET_MODE_CLASS (mode) == MODE_CC)
+//  {
+//    //return (regno == SNOWHOUSECPU_FLAGS);
+//    return (regno <= SNOWHOUSECPU_LAST_GENERAL_REGNUM);
+//  }
+//  //if (regno == SNOWHOUSECPU_FLAGS && GET_MODE_CLASS (mode) != MODE_CC)
+//  //{
+//  //  return false;
+//  //}
+//
+//  if (regno <= SNOWHOUSECPU_LR
+//    && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)
+//  {
+//    return true;
+//  }
+//  if (regno == HARD_FRAME_POINTER_REGNUM || regno == STACK_POINTER_REGNUM
+//    || regno == FRAME_POINTER_REGNUM || regno == ARG_POINTER_REGNUM)
+//  {
+//    return (GET_MODE_SIZE (mode) <= UNITS_PER_WORD);
+//  }
+//
+//  if (regno < SNOWHOUSECPU_LR
+//    && GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+//  {
+//    const unsigned int
+//      num_consec_regs = ((GET_MODE_SIZE (mode)) / UNITS_PER_WORD);
+//
+//    if ((regno % num_consec_regs) == 0)
+//    {
+//      return true;
+//    }
+//  }
+//  return false;
+//}
 static void
 snowhousecpu_setup_incoming_varargs
   (cumulative_args_t cum_v,
@@ -1952,8 +1956,8 @@ snowhousecpu_setup_incoming_varargs
 //#undef TARGET_TRAMPOLINE_INIT
 //#define TARGET_TRAMPOLINE_INIT snowhousecpu_trampoline_init
 
-#undef TARGET_HARD_REGNO_MODE_OK 
-#define TARGET_HARD_REGNO_MODE_OK snowhousecpu_hard_regno_mode_ok
+//#undef TARGET_HARD_REGNO_MODE_OK 
+//#define TARGET_HARD_REGNO_MODE_OK snowhousecpu_hard_regno_mode_ok
 
 #undef TARGET_ASM_NAMED_SECTION 
 #define TARGET_ASM_NAMED_SECTION snowhousecpu_asm_named_section

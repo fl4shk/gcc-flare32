@@ -54,7 +54,7 @@
   ""
   "@
   sub %0, %1, %2  // subsi3: =r, r, r
-  sub %0, %1, %2  // subsi3: =r, r, i"
+  add %0, %1, -%2  // subsi3: =r, r, i"
 )
 
 
@@ -546,7 +546,7 @@
   ;;""
   "@
   cpy %0, %1    // *mov16: =r, r
-  cpy %0, #%1    // *mov16: =r, i
+  cpy %0, %1    // *mov16: =r, i
   lduh %0, %1    // *mov16: =r, B
   sth %1, %0    // *mov16: =B, r"
 )
@@ -742,8 +742,8 @@
   [(set (pc)
     (if_then_else
       (match_operator 0 "comparison_operator"
-        [(match_operand:SI 1 "register_operand")
-        (match_operand:SI 2 "register_operand")])
+        [(match_operand:SI 1 "general_operand")
+        (match_operand:SI 2 "general_operand")])
       (label_ref (match_operand 3 ""))
       (pc)))]
   ""
@@ -756,6 +756,12 @@
   rtx label3 = operands[3];
   rtx j;
   rtx my_cond;
+  if (GET_CODE (op1) != REG) {
+	op1 = force_reg (SImode, op1);
+  }
+  if (GET_CODE (op2) != REG) {
+	op2 = force_reg (SImode, op2);
+  }
   if (
     code == EQ || code == NE
     || code == GEU || code == LTU || code == GTU || code == LEU
@@ -766,6 +772,10 @@
   }
   else
   {
+	//fprintf (
+	//	stderr,
+	//	"test\n"
+	//);
     gcc_unreachable ();
   }
   //rtx label3_ref = gen_rtx_LABEL_REF (Pmode, label3);
@@ -975,7 +985,7 @@
   ""
   "@
   bl %0    // *call: i
-  jl %0    // *call: r")
+  jl lr, %0    // *call: r")
 
 
 (define_expand "call_value"
@@ -1043,18 +1053,18 @@
   ""
   "@
   bl %1    // *call_value: =r, i
-  jl %1    // *call_value: =r, r"
+  jl lr, %1    // *call_value: =r, r"
 )
 
 ;;(define_insn "*call_value_indirect"
 ;;  [(set (match_operand 0 "register_operand" "=r")
-;;    (call (mem:HI (match_operand:SI 1 "register_operand" "r"))
+;;    (call (mem:SI (match_operand:SI 1 "register_operand" "r"))
 ;;      (match_operand 2 "" "")))
 ;;      (clobber (reg:SI REG_LR))]
 ;;  ""
 ;;  "jl %1    // *call_value_indirect: =r, r")
-
-;; borrowed from RISC-V
+;;
+;;;; borrowed from RISC-V
 ;;(define_insn "stack_tie<mode>"
 ;;  [(set (mem:BLK (scratch))
 ;;    (unspec:BLK [(match_operand:X 0 "register_operand" "r")
