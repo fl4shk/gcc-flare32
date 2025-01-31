@@ -21,6 +21,8 @@
 #ifndef GCC_SNOWHOUSECPU_H
 #define GCC_SNOWHOUSECPU_H
 
+#include "../elfos.h"
+
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC "%{!mno-crt0:crt0%O%s} crti.o%s crtbegin.o%s"
 
@@ -259,12 +261,12 @@
 
 //#define REG_ALLOC_ORDER
 // {
-//   0, 1, 2,	    /* r1, r2, r3 */
-//   3, 4, 5, 6,	    /* r4, r5, r6, r7 */
-//   7, 8, 9, 10,	    /* r8, r9, r10, r11 */
+//   0, 1, 2,       /* r1, r2, r3 */
+//   3, 4, 5, 6,            /* r4, r5, r6, r7 */
+//   7, 8, 9, 10,           /* r8, r9, r10, r11 */
 //   11, 12, 13, 14,  /* r12, lr, fp, sp */
-//   15, 16,	    /* fake_fp, fake_ap */
-//   17,		    /* pc */
+//   15, 16,        /* fake_fp, fake_ap */
+//   17,                    /* pc */
 // }
 
 //#define HONOR_REG_ALLOC_ORDER 1
@@ -459,9 +461,9 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 /* Since we use .init_array/.fini_array we don't need the markers at
    the start and end of the ctors/dtors arrays.  */
 #define CTOR_LIST_BEGIN asm (CTORS_SECTION_ASM_OP)
-#define CTOR_LIST_END		/* empty */
+#define CTOR_LIST_END           /* empty */
 #define DTOR_LIST_BEGIN asm (DTORS_SECTION_ASM_OP)
-#define DTOR_LIST_END		/* empty */
+#define DTOR_LIST_END           /* empty */
 
 // Assembler Commands for Alignment
 
@@ -469,39 +471,76 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
    that says to advance the location counter
    to a multiple of 2**LOG bytes.  */
 
-#define ASM_OUTPUT_ALIGN(FILE,LOG)	\
-  if ((LOG) != 0)			\
+#define ASM_OUTPUT_ALIGN(FILE,LOG)      \
+  if ((LOG) != 0)                       \
     fprintf (FILE, "\t.align %d\n", (1 << (LOG)))
 
-#define ASM_OUTPUT_SKIP(FILE,SIZE)  \
-  fprintf (FILE, "\t.skip " HOST_WIDE_INT_PRINT_UNSIGNED"\n", (SIZE))
+//#undef ASM_OUTPUT_SKIP
+//#define ASM_OUTPUT_SKIP(FILE,SIZE)
+//  fprintf (FILE, "\t.skip " HOST_WIDE_INT_PRINT_UNSIGNED"\n", (SIZE))
 
 /* This says how to output an assembler line
    to define a global common symbol.  */
-
+#undef ASM_OUTPUT_COMMON
 #define ASM_OUTPUT_COMMON(FILE, NAME, SIZE, ROUNDED)  \
-( fputs ("\t.common ", (FILE)),		\
-  assemble_name ((FILE), (NAME)),		\
+( fputs ("\t.common ", (FILE)),         \
+  assemble_name ((FILE), (NAME)),               \
   fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\"\n", (SIZE)))
+
+/* Return a nonzero value if DECL has a section attribute.  */
+#define IN_NAMED_SECTION_P(DECL)					\
+  ((TREE_CODE (DECL) == FUNCTION_DECL || VAR_P (DECL))	\
+   && DECL_SECTION_NAME (DECL) != NULL)
 
 /* This says how to output an assembler line to define a local common
    symbol.  */
 
-#define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGNED)		\
-( fputs ("\t.reserve ", (FILE)),					\
-  assemble_name ((FILE), (NAME)),					\
-  fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\",%u\n",	\
-	   (SIZE), ((ALIGNED) / BITS_PER_UNIT)))
+#undef  ASM_OUTPUT_ALIGNED_DECL_LOCAL
+#define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN)	\
+  do									\
+    {									\
+      if ((DECL) != NULL && IN_NAMED_SECTION_P (DECL))			\
+	switch_to_section (get_named_section (DECL, NULL, 0));		\
+      else								\
+	switch_to_section (bss_section);				\
+									\
+      ASM_OUTPUT_ALIGN (FILE, floor_log2 (ALIGN / BITS_PER_UNIT));	\
+      ASM_OUTPUT_LABEL (FILE, NAME);					\
+      fprintf (FILE, "\t.space\t%d\n", SIZE ? (int) SIZE : 1);		\
+      fprintf (FILE, "\t.size\t%s, %d\n",				\
+	       NAME, SIZE ? (int) SIZE : 1);				\
+    }									\
+  while (0)
+
+/* #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGNED)          */ \
+/* ( fputs ("\t.space ", (FILE)),                                       */ \
+/*   assemble_name ((FILE), (NAME)),                            */      \
+/*   fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\",%u\n",  */ \
+/*         (SIZE), ((ALIGNED) / BITS_PER_UNIT)))                */
 
 /* A C statement (sans semicolon) to output to the stdio stream
    FILE the assembler definition of uninitialized global DECL named
    NAME whose size is SIZE bytes and alignment is ALIGN bytes.
    Try to use asm_output_aligned_bss to implement this macro.  */
+#undef  ASM_OUTPUT_ALIGNED_BSS
+#define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)   	\
+  do									\
+    {									\
+      if (IN_NAMED_SECTION_P (DECL))					\
+	switch_to_section (get_named_section (DECL, NULL, 0));		\
+      else								\
+	switch_to_section (bss_section);				\
+      									\
+      ASM_OUTPUT_ALIGN (FILE, floor_log2 (ALIGN / BITS_PER_UNIT));	\
+									\
+      last_assemble_variable_decl = DECL;				\
+      ASM_DECLARE_OBJECT_NAME (FILE, NAME, DECL);			\
+      ASM_OUTPUT_SKIP (FILE, SIZE ? (int)(SIZE) : 1);			\
+    } 									\
+  while (0)
 
-#define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)	\
-  do {								\
-    ASM_OUTPUT_ALIGNED_LOCAL (FILE, NAME, SIZE, ALIGN);		\
-  } while (0)
+
+
 
 /* Output #ident as a .ident.  */
 
@@ -949,6 +988,7 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 
 #define STRUCTURE_SIZE_BOUNDARY FASTEST_ALIGNMENT
 
+#undef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX "_"
 
 /* This is how to store into the string LABEL
@@ -956,8 +996,9 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
    PREFIX is the class of label and NUM is the number within the class.
    This is suitable for output with `assemble_name'.  */
 
-#define ASM_GENERATE_INTERNAL_LABEL(LABEL,PREFIX,NUM)	\
-  sprintf ((LABEL), "*%s%ld", (PREFIX), (long)(NUM))
+#undef ASM_GENERATE_INTERNAL_LABEL
+#define ASM_GENERATE_INTERNAL_LABEL(LABEL,PREFIX,NUM)   \
+  sprintf ((LABEL), "*.%s%ld", (PREFIX), (long)(NUM))
 
 // Generating Code for Profiling
 #define FUNCTION_PROFILER(FILE,LABELNO) (abort (), 0)
