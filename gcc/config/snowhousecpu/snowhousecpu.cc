@@ -53,7 +53,7 @@ snowhousecpu_dump_file_debug_rtx (FILE* file, const_rtx x)
 /* This file should be included last.  */
 #include "target-def.h"
 
-#define SNOWHOUSECPU_DEBUG
+//#define SNOWHOUSECPU_DEBUG
 //#define SNOWHOUSECPU_CONSTRAINT_DEBUG
 //#define SNOWHOUSECPU_CONSTRAINT_4ADDR_DEBUG
 

@@ -39,12 +39,19 @@
 // standard C library (unless we are building a shared library) and
 // the simulator BSP code.
 
-#undef LIB_SPEC
-#define LIB_SPEC "%{!shared:%{!symbolic:-lc}}"
+//#undef LIB_SPEC
+//#define LIB_SPEC "%{!shared:%{!symbolic:-lc}}"
+//#undef LIB_SPEC
+//#define LIB_SPEC "%{!static:%{!symbolic:-lc}}"
 
+//#undef LINK_SPEC
+//#define LINK_SPEC "%{h*} %{v:-V} %{!mel:-EB} %{mel:-EL}
+//    %{static:-Bstatic} %{shared:-shared} %{symbolic:-Bsymbolic}"
 #undef LINK_SPEC
-#define LINK_SPEC "%{h*} %{v:-V} %{!mel:-EB} %{mel:-EL}\
-    %{static:-Bstatic} %{shared:-shared} %{symbolic:-Bsymbolic}"
+#define LINK_SPEC \
+	"%{mel:-EL}" \
+    "%{static:-static} " \
+	"%{shared:%eshared is not supported} "
 
 //#ifndef MULTILIB_DEFAULTS
 //#define MULTILIB_DEFAULTS { "meb" }
@@ -481,11 +488,11 @@ snowhousecpu_regno_to_class[FIRST_PSEUDO_REGISTER] =
 
 /* This says how to output an assembler line
    to define a global common symbol.  */
-#undef ASM_OUTPUT_COMMON
-#define ASM_OUTPUT_COMMON(FILE, NAME, SIZE, ROUNDED)  \
-( fputs ("\t.common ", (FILE)),         \
-  assemble_name ((FILE), (NAME)),               \
-  fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\"\n", (SIZE)))
+//#undef ASM_OUTPUT_COMMON
+//#define ASM_OUTPUT_COMMON(FILE, NAME, SIZE, ROUNDED)  
+//( fputs ("\t.common ", (FILE)),         
+//  assemble_name ((FILE), (NAME)),               
+//  fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED",\"bss\"\n", (SIZE)))
 
 /* Return a nonzero value if DECL has a section attribute.  */
 #define IN_NAMED_SECTION_P(DECL)					\
