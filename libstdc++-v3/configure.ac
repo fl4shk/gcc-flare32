@@ -31,7 +31,7 @@ AC_CANONICAL_SYSTEM
 target_alias=${target_alias-$host_alias}
 
 # Handy for debugging:
-#AC_MSG_NOTICE($build / $host / $target / $host_alias / $target_alias); sleep 5
+AC_MSG_NOTICE($build / $host / $target / $host_alias / $target_alias); sleep 5
 
 if test "$build" != "$host"; then
   # We are being configured with some form of cross compiler.

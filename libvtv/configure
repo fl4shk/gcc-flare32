@@ -13451,6 +13451,11 @@ fi
 	    ;;
         esac
         ;;
+      elf*)
+		if test $host_cpu = snowhousecpu; then
+		  ld_shlibs_CXX=no
+		fi
+		;;
 
       freebsd2.*)
         # C++ shared libraries reported to be fairly broken before
@@ -15767,6 +15772,7 @@ fi
   lt_cv_prog_gnu_ldcxx=$lt_cv_prog_gnu_ld
   lt_cv_prog_gnu_ld=$lt_save_with_gnu_ld
 fi # test "$_lt_caught_CXX_error" != yes
+echo "ld_shlibs=" $ld_shlibs
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'

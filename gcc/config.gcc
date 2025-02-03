@@ -1852,7 +1852,7 @@ moxie-*-moxiebox*)
 	;;
 snowhousecpu-*-elf)
 	gas=yes
-	gnu_ld=no
+	gnu_ld=yes
 	tm_file="${tm_file} newlib-stdint.h"
 	tmake_file="${tmake_file} snowhousecpu/t-snowhousecpu"
 	;;

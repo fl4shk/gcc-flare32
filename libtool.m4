@@ -5871,6 +5871,11 @@ if test "$_lt_caught_CXX_error" != yes; then
 	    ;;
         esac
         ;;
+      elf*)
+		if test $host_cpu = snowhousecpu; then
+		  _LT_TAGVAR(ld_shlibs, $1)=no
+		fi
+		;;
 
       freebsd2.*)
         # C++ shared libraries reported to be fairly broken before
@@ -6547,6 +6552,7 @@ if test "$_lt_caught_CXX_error" != yes; then
   lt_cv_prog_gnu_ldcxx=$lt_cv_prog_gnu_ld
   lt_cv_prog_gnu_ld=$lt_save_with_gnu_ld
 fi # test "$_lt_caught_CXX_error" != yes
+echo "ld_shlibs=" $ld_shlibs
 
 AC_LANG_POP
 ])# _LT_LANG_CXX_CONFIG

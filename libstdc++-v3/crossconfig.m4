@@ -35,6 +35,22 @@ case "${host}" in
     AC_DEFINE(HAVE_TANHF)
     ;;
 
+  snowhousecpu*-*-*)
+    GLIBCXX_CHECK_COMPILER_FEATURES
+    GLIBCXX_CHECK_LINKER_FEATURES
+    GLIBCXX_CHECK_MATH_SUPPORT
+    GLIBCXX_CHECK_STDLIB_SUPPORT
+
+    AC_DEFINE(HAVE_FINITE)
+    AC_DEFINE(HAVE_HYPOT)
+    AC_DEFINE(HAVE_ISNAN)
+    AC_DEFINE(HAVE_ISINF)
+
+    AC_DEFINE(HAVE_LDEXPF)
+    AC_DEFINE(HAVE_MODF)
+    AC_DEFINE(HAVE_SQRTF)
+    ;;
+
   mips*-sde-elf*)
     # These definitions are for the SDE C library rather than newlib.
     SECTION_FLAGS='-ffunction-sections -fdata-sections'

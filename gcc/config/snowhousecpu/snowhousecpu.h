@@ -24,6 +24,7 @@
 #include "../elfos.h"
 
 #undef  STARTFILE_SPEC
+//#define STARTFILE_SPEC "%{!mno-crt0:crt0%O%s} crti.o%s crtbegin.o%s"
 #define STARTFILE_SPEC "%{!mno-crt0:crt0%O%s} crti.o%s crtbegin.o%s"
 
 // Provide an ENDFILE_SPEC appropriate for svr4.  Here we tack on our own
